@@ -1,0 +1,77 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PhpNl\LaravelApiDoc\Extraction;
+
+use Illuminate\Support\Facades\Cache;
+use PhpNl\LaravelApiDoc\Data\Endpoint;
+use PhpNl\LaravelApiDoc\Data\Parameter;
+use PhpNl\LaravelApiDoc\Data\Response;
+
+final readonly class DocumentationManager
+{
+    public function __construct(
+        private Generator $generator,
+    ) {
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get(): array
+    {
+        return Cache::rememberForever('laravel-api-doc.documentation', function () {
+            return $this->fresh();
+        });
+    }
+
+    public function cache(): void
+    {
+        Cache::forever('laravel-api-doc.documentation', $this->fresh());
+    }
+
+    public function clear(): void
+    {
+        Cache::forget('laravel-api-doc.documentation');
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fresh(): array
+    {
+        return array_map(
+            fn (Endpoint $endpoint) => $this->endpointToArray($endpoint),
+            $this->generator->generate()
+        );
+    }
+
+    /**
+     * @param Endpoint $endpoint
+     * @return array<string, mixed>
+     */
+    private function endpointToArray(Endpoint $endpoint): array
+    {
+        return [
+            'id' => md5(implode('|', $endpoint->methods) . '|' . $endpoint->uri),
+            'uri' => $endpoint->uri,
+            'methods' => $endpoint->methods,
+            'name' => $endpoint->name,
+            'group' => $endpoint->group,
+            'description' => $endpoint->description,
+            'parameters' => array_map(fn (Parameter $p) => [
+                'name' => $p->name,
+                'type' => $p->type,
+                'required' => $p->required,
+                'description' => $p->description,
+                'default' => $p->default,
+            ], $endpoint->parameters),
+            'responses' => array_map(fn (Response $r) => [
+                'status' => $r->status,
+                'description' => $r->description,
+                'schema' => $r->schema,
+            ], $endpoint->responses),
+        ];
+    }
+}
