@@ -24,7 +24,12 @@ final readonly class SignatureExtractor implements Extractor
             return;
         }
 
-        [$controller, $method] = explode('@', $action['controller']);
+        if (str_contains($action['controller'], '@')) {
+            [$controller, $method] = explode('@', $action['controller']);
+        } else {
+            $controller = $action['controller'];
+            $method = '__invoke';
+        }
 
         if (!method_exists($controller, $method)) {
             return;
