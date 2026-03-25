@@ -21,6 +21,7 @@ final readonly class Parameter
         public mixed $default = null,
         public string $in = 'query',
         public array $rules = [],
+        public ?array $enumValues = null,
     ) {
     }
 }

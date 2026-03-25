@@ -15,7 +15,36 @@
         </div>
     </div>
     
-    <div class="bg-black/40 rounded-lg border border-white/5 overflow-hidden">
-        <pre class="p-4 overflow-x-auto text-sm font-mono text-slate-300 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"><code>{{ is_array($response['body'] ?? null) ? json_encode($response['body'] ?? [], JSON_PRETTY_PRINT) : ($response['body'] ?? '') }}</code></pre>
+    <div class="bg-slate-900 rounded-xl border border-white/5 overflow-hidden" x-data="{ responseTab: 'body' }">
+        <div class="flex items-center px-2 pt-1 border-b border-slate-800 bg-slate-900/80 space-x-1">
+            <button @click="responseTab = 'body'" :class="responseTab === 'body' ? 'text-white border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'" class="px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase transition-colors focus:outline-none -mb-px">Body</button>
+            <button @click="responseTab = 'headers'" :class="responseTab === 'headers' ? 'text-white border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'" class="px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase transition-colors focus:outline-none -mb-px">Headers</button>
+        </div>
+        
+        <div class="bg-black/40 min-h-[100px]">
+            <!-- Body Tab -->
+            <div x-show="responseTab === 'body'" class="w-full">
+                <pre class="p-4 overflow-x-auto text-[13px] font-mono text-slate-300 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"><code>{{ is_array($response['body'] ?? null) ? json_encode($response['body'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : ($response['body'] ?? '') }}</code></pre>
+            </div>
+            
+            <!-- Headers Tab -->
+            <div x-show="responseTab === 'headers'" x-cloak class="w-full p-5 overflow-x-auto">
+                <table class="w-full text-left border-collapse text-[13px] font-mono">
+                    <tbody class="divide-y divide-slate-800/50">
+                        @foreach($response['headers'] ?? [] as $key => $values)
+                            <tr>
+                                <td class="py-2.5 pr-6 text-indigo-400 font-semibold align-top whitespace-nowrap">{{ $key }}</td>
+                                <td class="py-2.5 text-slate-300 break-all">{{ is_array($values) ? implode(', ', $values) : $values }}</td>
+                            </tr>
+                        @endforeach
+                        @if(empty($response['headers']))
+                            <tr>
+                                <td class="py-3 text-slate-500 italic text-center">No headers returned.</td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>

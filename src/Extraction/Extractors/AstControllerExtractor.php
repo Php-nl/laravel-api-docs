@@ -120,6 +120,7 @@ final readonly class AstControllerExtractor implements Extractor
 
             $paramName = $item->key->value;
             $rules = [];
+            $enumValues = null;
 
             if ($item->value instanceof Node\Scalar\String_) {
                 $rules = explode('|', $item->value->value);
@@ -128,6 +129,18 @@ final readonly class AstControllerExtractor implements Extractor
                     if ($ruleItem && $ruleItem->value instanceof Node\Scalar\String_) {
                         $rules[] = $ruleItem->value->value;
                     }
+                }
+            }
+
+            foreach ($rules as $idx => $r) {
+                if (str_starts_with($r, 'enum:')) {
+                    $enumClass = substr($r, 5);
+                    if (function_exists('enum_exists') && enum_exists($enumClass)) {
+                        $enumValues = array_map(fn($case) => $case->value ?? $case->name, $enumClass::cases());
+                        $rules[$idx] = 'enum:' . implode(',', $enumValues);
+                    }
+                } elseif (str_starts_with($r, 'in:')) {
+                    $enumValues = explode(',', substr($r, 3));
                 }
             }
 
@@ -149,6 +162,7 @@ final readonly class AstControllerExtractor implements Extractor
                         description: 'Validation rules: ' . implode('|', $rules),
                         in: in_array('GET', $endpoint->methods, true) ? 'query' : 'body',
                         rules: $rules,
+                        enumValues: $enumValues
                     ));
                 }
             }
@@ -169,6 +183,9 @@ final readonly class AstControllerExtractor implements Extractor
         }
         if (in_array('array', $rules, true)) {
             return 'array';
+        }
+        if (in_array('file', $rules, true) || in_array('image', $rules, true)) {
+            return 'file';
         }
         return 'string';
     }

@@ -69,6 +69,7 @@ final readonly class DocumentationManager
                 'description' => $p->description,
                 'default' => $p->default,
                 'rules' => $p->rules,
+                'enumValues' => $p->enumValues,
             ], $endpoint->parameters),
             'responses' => array_map(fn (Response $r) => [
                 'status' => $r->status,

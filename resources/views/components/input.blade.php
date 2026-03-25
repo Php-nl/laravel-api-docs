@@ -1,4 +1,4 @@
-@props(['label' => null, 'required' => false, 'type' => 'text', 'description' => null, 'theme' => 'light'])
+@props(['label' => null, 'required' => false, 'type' => 'text', 'description' => null, 'theme' => 'light', 'enumValues' => null])
 
 @php
 $isDark = $theme === 'dark';
@@ -23,7 +23,18 @@ $inputClass = $isDark
             @endif
         </label>
     @endif
-    <input type="{{ $type }}" {{ $attributes->except(['type-hint', 'theme']) }} class="w-full px-3 py-2 border rounded-md shadow-sm sm:text-sm outline-none transition-colors {{ $inputClass }}">
+    @if(is_array($enumValues) && count($enumValues) > 0)
+        <select {{ $attributes->except(['type-hint', 'theme']) }} class="w-full px-3 py-2 border rounded-md shadow-sm sm:text-sm outline-none transition-colors appearance-none {{ $inputClass }}">
+            @if(!$required)
+                <option value="">(None)</option>
+            @endif
+            @foreach($enumValues as $val)
+                <option value="{{ $val }}">{{ $val }}</option>
+            @endforeach
+        </select>
+    @else
+        <input type="{{ $type }}" {{ $attributes->except(['type-hint', 'theme']) }} class="w-full px-3 py-2 border rounded-md shadow-sm sm:text-sm outline-none transition-colors {{ $inputClass }}">
+    @endif
     @if($description)
         <p class="mt-1.5 text-xs {{ $descClass }}">{{ $description }}</p>
     @endif

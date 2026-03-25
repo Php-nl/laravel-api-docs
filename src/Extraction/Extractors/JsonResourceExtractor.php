@@ -48,11 +48,76 @@ final readonly class JsonResourceExtractor implements Extractor
 
         $className = $returnType->getName();
 
-        if (is_subclass_of($className, JsonResource::class)) {
+        if (is_subclass_of($className, JsonResource::class) || $className === \Illuminate\Http\Resources\Json\AnonymousResourceCollection::class) {
+            
+            $innerResourceClass = null;
+            $docBlock = $reflection->getDocComment() ?: '';
+
+            if ($className === \Illuminate\Http\Resources\Json\AnonymousResourceCollection::class) {
+                if (preg_match('/@return\s+.*AnonymousResourceCollection<([A-Za-z0-9_\\\\]+)>/', $docBlock, $matches)) {
+                    $innerResourceClass = ltrim($matches[1], '\\');
+                    if (!str_contains($innerResourceClass, '\\')) {
+                        $innerResourceClass = "App\\Http\\Resources\\" . $innerResourceClass;
+                    }
+                }
+            }
+
+            $schema = $this->extractSchema($innerResourceClass ?: $className);
+
+            if ($innerResourceClass) {
+                $isPaginated = false;
+                $fileName = $reflection->getFileName();
+                if ($fileName && file_exists($fileName)) {
+                    $source = file_get_contents($fileName);
+                    // Check if the method body contains "paginate"
+                    $methodBody = substr($source, $reflection->getStartLine() - 1, $reflection->getEndLine() - $reflection->getStartLine() + 1);
+                    if (str_contains($methodBody, 'paginate')) {
+                        $isPaginated = true;
+                    }
+                }
+
+                $collectionSchema = [
+                    'type' => 'object',
+                    'properties' => [
+                        'data' => [
+                            'type' => 'array',
+                            'items' => $schema,
+                        ]
+                    ]
+                ];
+
+                if ($isPaginated) {
+                    $collectionSchema['properties']['links'] = [
+                        'type' => 'object',
+                        'properties' => [
+                            'first' => ['type' => 'string', 'example' => url('/api/resource?page=1')],
+                            'last' => ['type' => 'string', 'example' => url('/api/resource?page=1')],
+                            'prev' => ['type' => 'string', 'example' => null],
+                            'next' => ['type' => 'string', 'example' => null],
+                        ]
+                    ];
+                    
+                    $collectionSchema['properties']['meta'] = [
+                        'type' => 'object',
+                        'properties' => [
+                            'current_page' => ['type' => 'number', 'example' => 1],
+                            'from' => ['type' => 'number', 'example' => 1],
+                            'last_page' => ['type' => 'number', 'example' => 1],
+                            'path' => ['type' => 'string', 'example' => url('/api/resource')],
+                            'per_page' => ['type' => 'number', 'example' => 15],
+                            'to' => ['type' => 'number', 'example' => 15],
+                            'total' => ['type' => 'number', 'example' => 15],
+                        ]
+                    ];
+                }
+
+                $schema = $collectionSchema;
+            }
+
             $endpoint->addResponse(new Response(
                 status: 200,
                 description: "Successful response returning {$className}",
-                schema: $this->extractSchema($className)
+                schema: $schema
             ));
         }
     }

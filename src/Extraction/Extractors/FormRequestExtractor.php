@@ -75,28 +75,67 @@ final readonly class FormRequestExtractor implements Extractor
         }
 
         foreach ($rules as $name => $rule) {
-            // Flatten custom rule objects or arrays for simple string representation if needed
             $ruleArray = [];
+            $enumValues = null;
+
             if (is_array($rule)) {
                 foreach ($rule as $r) {
+                    if ($r instanceof \Illuminate\Validation\Rules\Enum) {
+                        try {
+                            $refProperty = new \ReflectionProperty($r, 'type');
+                            $refProperty->setAccessible(true);
+                            $enumClass = $refProperty->getValue($r);
+                            
+                            if (function_exists('enum_exists') && enum_exists($enumClass)) {
+                                $enumValues = array_map(fn($case) => $case->value ?? $case->name, $enumClass::cases());
+                                $ruleArray[] = 'enum:' . implode(',', $enumValues);
+                                continue;
+                            }
+                        } catch (\Throwable) {}
+                    }
+                    
+                    if (is_string($r) && function_exists('enum_exists') && enum_exists($r)) {
+                        $enumValues = array_map(fn($case) => $case->value ?? $case->name, $r::cases());
+                        $ruleArray[] = 'enum:' . implode(',', $enumValues);
+                        continue;
+                    }
+
+                    if ($r instanceof \Illuminate\Validation\Rules\In) {
+                        try {
+                            $refProperty = new \ReflectionProperty($r, 'values');
+                            $refProperty->setAccessible(true);
+                            $enumValues = $refProperty->getValue($r);
+                            $ruleArray[] = 'in:' . implode(',', $enumValues);
+                            continue;
+                        } catch (\Throwable) {}
+                    }
+
                     $ruleArray[] = is_object($r) ? get_class($r) : (string) $r;
                 }
             } else {
                 $ruleArray = explode('|', (string) $rule);
+                foreach ($ruleArray as $idx => $r) {
+                    if (str_starts_with($r, 'enum:')) {
+                        $enumClass = substr($r, 5);
+                        if (function_exists('enum_exists') && enum_exists($enumClass)) {
+                            $enumValues = array_map(fn($case) => $case->value ?? $case->name, $enumClass::cases());
+                            $ruleArray[$idx] = 'enum:' . implode(',', $enumValues);
+                        }
+                    } elseif (str_starts_with($r, 'in:')) {
+                        $enumValues = explode(',', substr($r, 3));
+                    }
+                }
             }
 
             $ruleString = implode('|', $ruleArray);
 
-            // Simple parsing of rules to determine type and requirement
             $isRequired = in_array('required', $ruleArray) || str_contains($ruleString, 'required');
             $type = $this->determineType($ruleString);
 
-            // Check if parameter already exists
             $exists = false;
             foreach ($endpoint->parameters as $parameter) {
                 if ($parameter->name === $name) {
                     $exists = true;
-                    // Could update rules if we want to overwrite, but skip for now
                     break;
                 }
             }
@@ -108,7 +147,8 @@ final readonly class FormRequestExtractor implements Extractor
                     required: $isRequired,
                     description: null,
                     in: $in,
-                    rules: $ruleArray
+                    rules: $ruleArray,
+                    enumValues: $enumValues
                 ));
             }
         }
@@ -136,6 +176,10 @@ final readonly class FormRequestExtractor implements Extractor
 
         if (str_contains($rules, 'date')) {
             return 'date';
+        }
+
+        if (str_contains($rules, 'file') || str_contains($rules, 'image')) {
+            return 'file';
         }
 
         return 'string';

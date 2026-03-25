@@ -5,17 +5,25 @@ declare(strict_types=1);
 namespace PhpNl\LaravelApiDoc\Livewire;
 
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
 use PhpNl\LaravelApiDoc\Data\Parameter;
 use PhpNl\LaravelApiDoc\Data\Response;
 
 final class Dashboard extends Component
 {
+    use WithFileUploads;
     /** @var array<int, array<string, mixed>> */
     public array $endpoints = [];
 
+    /** @var array<string, array<string, mixed>> */
+    public array $schemas = [];
+
     /** @var string|null */
     public ?string $selectedId = null;
+
+    /** @var string|null */
+    public ?string $selectedSchemaId = null;
 
     /** @var string */
     public string $search = '';
@@ -24,24 +32,31 @@ final class Dashboard extends Component
     public array $tryItOutForm = [];
 
     /** @var string */
+    #[\Livewire\Attributes\Session]
     public string $globalAuthMethod = 'none'; // none, bearer, basic, api_key
 
     /** @var string */
+    #[\Livewire\Attributes\Session]
     public string $globalAuthToken = '';
 
     /** @var string */
+    #[\Livewire\Attributes\Session]
     public string $globalAuthUsername = '';
 
     /** @var string */
+    #[\Livewire\Attributes\Session]
     public string $globalAuthPassword = '';
 
     /** @var string */
+    #[\Livewire\Attributes\Session]
     public string $globalApiKeyName = 'X-API-Key';
 
     /** @var string */
+    #[\Livewire\Attributes\Session]
     public string $globalApiKeyValue = '';
 
     /** @var string */
+    #[\Livewire\Attributes\Session]
     public string $globalApiKeyLocation = 'header'; // header, query
 
     /** @var bool */
@@ -56,6 +71,40 @@ final class Dashboard extends Component
     public function mount(\PhpNl\LaravelApiDoc\Extraction\DocumentationManager $manager): void
     {
         $this->endpoints = $manager->get();
+        $this->schemas = $this->extractSchemas($this->endpoints);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $endpoints
+     * @return array<string, array<string, mixed>>
+     */
+    private function extractSchemas(array $endpoints): array
+    {
+        $schemas = [];
+        
+        foreach ($endpoints as $endpoint) {
+            foreach ($endpoint['responses'] ?? [] as $response) {
+                if (!empty($response['schema']) && isset($response['schema']['resource'])) {
+                    $resourceClass = $response['schema']['resource'];
+                    $baseName = class_basename($resourceClass);
+                    if (!isset($schemas[$baseName])) {
+                        $schemas[$baseName] = $response['schema'];
+                    }
+                }
+                
+                // Extract from collection arrays
+                if (!empty($response['schema']['items']) && isset($response['schema']['items']['resource'])) {
+                    $resourceClass = $response['schema']['items']['resource'];
+                    $baseName = class_basename($resourceClass);
+                    if (!isset($schemas[$baseName])) {
+                        $schemas[$baseName] = $response['schema']['items'];
+                    }
+                }
+            }
+        }
+        
+        ksort($schemas);
+        return $schemas;
     }
 
     /**
@@ -64,8 +113,13 @@ final class Dashboard extends Component
     public function selectEndpoint(string $id): void
     {
         $this->selectedId = $id;
+        $this->selectedSchemaId = null;
         $this->response = null;
-        $this->tryItOutForm = [];
+        $this->tryItOutForm = [
+            'query' => [],
+            'body' => [],
+            'path' => [],
+        ];
         
         // Auto-enable authentication for this endpoint if a global method is configured
         $this->useAuth = $this->globalAuthMethod !== 'none';
@@ -73,7 +127,8 @@ final class Dashboard extends Component
         $endpoint = $this->getSelectedEndpointProperty();
         if ($endpoint) {
             foreach ($endpoint['parameters'] as $parameter) {
-                $this->tryItOutForm[$parameter['name']] = $parameter['default'] ?? '';
+                $in = $parameter['in'] ?? 'query';
+                $this->tryItOutForm[$in][$parameter['name']] = $parameter['default'] ?? '';
             }
         }
     }
@@ -92,12 +147,19 @@ final class Dashboard extends Component
         $method = $endpoint['methods'][0];
         $uri = $endpoint['uri'];
 
-        $form = $this->tryItOutForm;
+        $pathParams = $this->tryItOutForm['path'] ?? [];
+        $queryParams = $this->tryItOutForm['query'] ?? [];
+        $bodyParams = $this->tryItOutForm['body'] ?? [];
 
-        foreach ($form as $key => $value) {
-            if (str_contains($uri, '{' . $key . '}')) {
-                $uri = str_replace('{' . $key . '}', (string) $value, $uri);
-                unset($form[$key]);
+        foreach ($pathParams as $key => $value) {
+            $uri = str_replace('{' . $key . '}', (string) $value, $uri);
+        }
+
+        $files = [];
+        foreach ($bodyParams as $key => $value) {
+            if ($value instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
+                $files[$key] = $value;
+                unset($bodyParams[$key]);
             }
         }
 
@@ -119,14 +181,39 @@ final class Dashboard extends Component
                             $this->globalApiKeyName => $this->globalApiKeyValue,
                         ]);
                     } elseif ($this->globalApiKeyLocation === 'query') {
-                        $uri .= (str_contains($uri, '?') ? '&' : '?') . urlencode($this->globalApiKeyName) . '=' . urlencode($this->globalApiKeyValue);
+                        $queryParams[$this->globalApiKeyName] = $this->globalApiKeyValue;
                     }
                 }
             }
 
-            $response = $request->send($method, url($uri), [
-                'json' => $form,
-            ]);
+            if (!empty($queryParams)) {
+                $uri .= (str_contains($uri, '?') ? '&' : '?') . http_build_query($queryParams);
+            }
+
+            if (!empty($files)) {
+                foreach ($files as $name => $file) {
+                    $request->attach(
+                        $name,
+                        file_get_contents($file->getRealPath()),
+                        $file->getClientOriginalName()
+                    );
+                }
+                $response = match (strtoupper($method)) {
+                    'POST' => $request->post(url($uri), $bodyParams),
+                    'PUT' => $request->put(url($uri), $bodyParams),
+                    'PATCH' => $request->patch(url($uri), $bodyParams),
+                    default => $request->send($method, url($uri)),
+                };
+            } else {
+                $response = match (strtoupper($method)) {
+                    'GET' => $request->get(url($uri)),
+                    'POST' => $request->post(url($uri), $bodyParams),
+                    'PUT' => $request->put(url($uri), $bodyParams),
+                    'PATCH' => $request->patch(url($uri), $bodyParams),
+                    'DELETE' => $request->delete(url($uri), $bodyParams),
+                    default => $request->send($method, url($uri), ['json' => $bodyParams]),
+                };
+            }
 
             $this->response = [
                 'status' => $response->status(),
@@ -149,6 +236,28 @@ final class Dashboard extends Component
     public function getSelectedEndpointProperty(): ?array
     {
         return collect($this->endpoints)->first(fn (array $e) => ($e['id'] ?? null) === $this->selectedId);
+    }
+
+    /**
+     * Select a schema view instead of an endpoint.
+     */
+    public function selectSchema(string $id): void
+    {
+        $this->selectedSchemaId = $id;
+        $this->selectedId = null;
+        $this->response = null;
+        $this->tryItOutForm = [];
+    }
+
+    /**
+     * Get the selected schema.
+     */
+    public function getSelectedSchemaProperty(): ?array
+    {
+        if (!$this->selectedSchemaId) {
+            return null;
+        }
+        return $this->schemas[$this->selectedSchemaId] ?? null;
     }
 
     /**
