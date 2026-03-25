@@ -180,25 +180,37 @@
                                             <svg class="w-4 h-4 text-gray-400 transform transition-transform" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                         </div>
                                         @if(!empty($response['schema']))
-                                            <div class="bg-slate-900 overflow-x-auto text-[13px] font-mono p-5" x-show="open" x-collapse>
-                                                @php
-                                                    $generateExample = function($schema) use (&$generateExample) {
-                                                        if (isset($schema['example'])) return $schema['example'];
-                                                        if ($schema['type'] === 'array' && isset($schema['items'])) {
-                                                            return [$generateExample($schema['items'])];
-                                                        }
-                                                        if ($schema['type'] === 'object' && isset($schema['properties'])) {
-                                                            $obj = [];
-                                                            foreach ($schema['properties'] as $k => $v) {
-                                                                $obj[$k] = $generateExample($v);
-                                                            }
-                                                            return $obj;
-                                                        }
-                                                        return null;
-                                                    };
-                                                    $exampleData = $generateExample($response['schema']);
-                                                @endphp
-                                                <pre><code class="text-slate-300">{!! json_encode($exampleData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!}</code></pre>
+                                            <div class="bg-slate-900 overflow-x-auto p-5" x-show="open" x-collapse>
+                                                <div class="flex flex-col lg:flex-row gap-8">
+                                                    <!-- Schema Tree -->
+                                                    <div class="flex-1 min-w-[250px]">
+                                                        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Schema</h4>
+                                                        <x-api-doc::schema-tree :schema="$response['schema']" />
+                                                    </div>
+                                                    
+                                                    <!-- Example JSON -->
+                                                    <div class="flex-1 min-w-[300px] bg-black/40 rounded-lg border border-white/5 p-4 h-fit">
+                                                        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Example Payload</h4>
+                                                        @php
+                                                            $generateExample = function($schema) use (&$generateExample) {
+                                                                if (isset($schema['example'])) return $schema['example'];
+                                                                if ($schema['type'] === 'array' && isset($schema['items'])) {
+                                                                    return [$generateExample($schema['items'])];
+                                                                }
+                                                                if ($schema['type'] === 'object' && isset($schema['properties'])) {
+                                                                    $obj = [];
+                                                                    foreach ($schema['properties'] as $k => $v) {
+                                                                        $obj[$k] = $generateExample($v);
+                                                                    }
+                                                                    return $obj;
+                                                                }
+                                                                return null;
+                                                            };
+                                                            $exampleData = $generateExample($response['schema']);
+                                                        @endphp
+                                                        <pre class="font-mono text-[13px] text-slate-300"><code>{!! json_encode($exampleData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!}</code></pre>
+                                                    </div>
+                                                </div>
                                             </div>
                                         @endif
                                     </div>
