@@ -60,12 +60,15 @@ final readonly class DocumentationManager
             'name' => $endpoint->name,
             'group' => $endpoint->group,
             'description' => $endpoint->description,
+            'auth_required' => $endpoint->authRequired,
             'parameters' => array_map(fn (Parameter $p) => [
                 'name' => $p->name,
+                'in' => $p->in,
                 'type' => $p->type,
                 'required' => $p->required,
                 'description' => $p->description,
                 'default' => $p->default,
+                'rules' => $p->rules,
             ], $endpoint->parameters),
             'responses' => array_map(fn (Response $r) => [
                 'status' => $r->status,

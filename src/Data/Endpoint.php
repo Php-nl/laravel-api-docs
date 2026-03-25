@@ -23,6 +23,7 @@ final class Endpoint
         public ?string $description = null,
         public array $parameters = [],
         public array $responses = [],
+        public bool $authRequired = false,
     ) {
     }
 

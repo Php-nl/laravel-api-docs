@@ -33,6 +33,25 @@ final readonly class DocblockExtractor implements Extractor
             return;
         }
 
+        $reflectionClass = new \ReflectionClass($controller);
+        $classDocComment = $reflectionClass->getDocComment();
+
+        $groupName = null;
+
+        if ($classDocComment !== false) {
+            if (preg_match('/@group\s+(.+)/', $classDocComment, $matches)) {
+                $groupName = trim($matches[1]);
+            }
+        }
+
+        if ($groupName === null) {
+            $controllerName = class_basename($controller);
+            $groupName = str_replace('Controller', '', $controllerName);
+            $groupName = trim(preg_replace('/(?<!^)[A-Z]/', ' $0', $groupName));
+        }
+
+        $endpoint->group = $groupName;
+
         $reflection = new ReflectionMethod($controller, $method);
         $docComment = $reflection->getDocComment();
 
@@ -89,6 +108,11 @@ final readonly class DocblockExtractor implements Extractor
 
         if ($description !== '') {
             $endpoint->description = $description;
+        }
+
+        // Extract @group from method docblock (overrides class group)
+        if (preg_match('/@group\s+(.+)/', $docComment, $matches)) {
+            $endpoint->group = trim($matches[1]);
         }
     }
 }

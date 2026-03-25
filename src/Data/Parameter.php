@@ -19,6 +19,8 @@ final readonly class Parameter
         public bool $required = true,
         public ?string $description = null,
         public mixed $default = null,
+        public string $in = 'query',
+        public array $rules = [],
     ) {
     }
 }

@@ -69,11 +69,26 @@ final readonly class FormRequestExtractor implements Extractor
 
         $rules = $formRequest->rules();
 
+        $in = 'query';
+        if (array_intersect(['POST', 'PUT', 'PATCH'], $endpoint->methods)) {
+            $in = 'body';
+        }
+
         foreach ($rules as $name => $rule) {
-            $ruleString = is_array($rule) ? implode('|', $rule) : (string) $rule;
+            // Flatten custom rule objects or arrays for simple string representation if needed
+            $ruleArray = [];
+            if (is_array($rule)) {
+                foreach ($rule as $r) {
+                    $ruleArray[] = is_object($r) ? get_class($r) : (string) $r;
+                }
+            } else {
+                $ruleArray = explode('|', (string) $rule);
+            }
+
+            $ruleString = implode('|', $ruleArray);
 
             // Simple parsing of rules to determine type and requirement
-            $isRequired = str_contains($ruleString, 'required');
+            $isRequired = in_array('required', $ruleArray) || str_contains($ruleString, 'required');
             $type = $this->determineType($ruleString);
 
             // Check if parameter already exists
@@ -81,6 +96,7 @@ final readonly class FormRequestExtractor implements Extractor
             foreach ($endpoint->parameters as $parameter) {
                 if ($parameter->name === $name) {
                     $exists = true;
+                    // Could update rules if we want to overwrite, but skip for now
                     break;
                 }
             }
@@ -90,7 +106,9 @@ final readonly class FormRequestExtractor implements Extractor
                     name: $name,
                     type: $type,
                     required: $isRequired,
-                    description: "Validation rules: {$ruleString}"
+                    description: null,
+                    in: $in,
+                    rules: $ruleArray
                 ));
             }
         }

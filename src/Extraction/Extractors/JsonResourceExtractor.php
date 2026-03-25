@@ -63,6 +63,21 @@ final readonly class JsonResourceExtractor implements Extractor
      */
     private function extractSchema(string $className): array
     {
+        $modelClass = $this->inferModelClass($className);
+        
+        if ($modelClass) {
+            $reader = new \PhpNl\LaravelApiDoc\Extraction\Support\EloquentSchemaReader();
+            $properties = $reader->read($modelClass);
+            
+            if (!empty($properties)) {
+                return [
+                    'type' => 'object',
+                    'resource' => $className,
+                    'properties' => $properties,
+                ];
+            }
+        }
+
         try {
             /** @var JsonResource $resource */
             $resource = new $className(new DummyResourceModel());
@@ -79,6 +94,45 @@ final readonly class JsonResourceExtractor implements Extractor
                 'resource' => $className,
             ];
         }
+    }
+
+    private function inferModelClass(string $resourceClass): ?string
+    {
+        if (!class_exists($resourceClass)) return null;
+
+        $reflection = new \ReflectionClass($resourceClass);
+        $docBlock = $reflection->getDocComment() ?: '';
+
+        if (preg_match('/@mixin\s+([A-Za-z0-9_\\\\]+)/', $docBlock, $matches)) {
+            $class = ltrim($matches[1], '\\');
+            if (class_exists($class)) {
+                return $class;
+            }
+        }
+
+        if (preg_match('/@property\s+([A-Za-z0-9_\\\\]+)\s+\$resource/', $docBlock, $matches)) {
+            $class = ltrim($matches[1], '\\');
+            if (class_exists($class)) {
+                return $class;
+            }
+        }
+
+        $baseName = class_basename($resourceClass);
+        $modelName = str_replace('Resource', '', $baseName);
+
+        $possibleNamespaces = [
+            "\\App\\Models\\",
+            "\\App\\",
+        ];
+
+        foreach ($possibleNamespaces as $namespace) {
+            $class = $namespace . $modelName;
+            if (class_exists($class)) {
+                return $class;
+            }
+        }
+
+        return null;
     }
 
     /**

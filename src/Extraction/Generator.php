@@ -39,6 +39,14 @@ final readonly class Generator
                 methods: $route->methods(),
             );
 
+            $middlewares = $route->gatherMiddleware();
+            foreach ((array) $middlewares as $middleware) {
+                if (is_string($middleware) && (str_starts_with($middleware, 'auth') || str_starts_with($middleware, 'sanctum'))) {
+                    $endpoint->authRequired = true;
+                    break;
+                }
+            }
+
             foreach ($this->getExtractors() as $extractor) {
                 $extractor->extract($route, $endpoint);
             }
@@ -76,6 +84,10 @@ final readonly class Generator
 
         if (Config::get('laravel-api-doc.extractors.json_resources', true)) {
             $extractors[] = new JsonResourceExtractor();
+        }
+
+        if (Config::get('laravel-api-doc.extractors.ast_controller', true)) {
+            $extractors[] = new \PhpNl\LaravelApiDoc\Extraction\Extractors\AstControllerExtractor();
         }
 
         return $extractors;

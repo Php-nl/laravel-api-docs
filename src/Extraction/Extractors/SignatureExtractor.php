@@ -86,6 +86,7 @@ final readonly class SignatureExtractor implements Extractor
             type: $type,
             required: !$parameter->isOptional(),
             default: $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null,
+            in: 'path',
         );
     }
 }

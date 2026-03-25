@@ -12,24 +12,36 @@
                 </div>
                 <input wire:model.live="search" type="text" placeholder="Search API..." class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]/50 focus:border-[var(--primary-color)] bg-white transition-all shadow-sm" />
             </div>
+            <div class="mt-4">
+                <a href="{{ route('laravel-api-doc.json') }}" target="_blank" class="w-full flex items-center justify-center px-4 py-2 border border-gray-200 shadow-sm text-xs font-semibold rounded-md text-gray-600 bg-gray-50 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+                    <svg class="w-3.5 h-3.5 mr-1.5 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    OpenAPI 3.1.0 JSON
+                </a>
+            </div>
         </div>
         <div class="flex-1 overflow-y-auto py-4 custom-scrollbar">
             @foreach($this->groups as $group => $endpoints)
-                <div class="mb-6">
-                    <h2 class="px-5 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center">
-                        <span class="bg-gray-200 h-px flex-1 mr-2"></span>
-                        {{ $group }}
-                        <span class="bg-gray-200 h-px flex-1 ml-2"></span>
-                    </h2>
-                    <div class="space-y-0.5 mt-3">
+                <div class="mb-6" x-data="{ expanded: {{ collect($endpoints)->contains('id', $selectedId) || $search !== '' ? 'true' : 'false' }} }">
+                    <button @click="expanded = !expanded" class="w-full px-5 mb-2 focus:outline-none group/toggle">
+                        <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center group-hover/toggle:text-gray-600 transition-colors">
+                            <span class="bg-gray-200 h-px flex-1 mr-2 group-hover/toggle:bg-gray-300 transition-colors"></span>
+                            <span>{{ $group }}</span>
+                            <span class="bg-gray-200 h-px flex-1 ml-2 mr-2 group-hover/toggle:bg-gray-300 transition-colors"></span>
+                            <svg class="w-3.5 h-3.5 transform transition-transform duration-200" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </h2>
+                    </button>
+                    <div class="space-y-0.5 mt-3" x-show="expanded" x-collapse x-cloak>
                         @foreach($endpoints as $endpoint)
                             <button wire:click="selectEndpoint('{{ $endpoint['id'] }}')" class="w-full text-left px-5 py-2.5 hover:bg-gray-100/80 transition-all group flex items-start space-x-3 border-l-2 {{ $selectedId === $endpoint['id'] ? 'bg-blue-50/50 border-[var(--primary-color)]' : 'border-transparent' }}">
                                 <div class="mt-0.5 w-14 flex-shrink-0">
                                     <x-api-doc::badge :method="$endpoint['methods'][0]" class="text-[10px] px-1.5 py-0.5 rounded shadow-sm opacity-90 group-hover:opacity-100 {{ $selectedId === $endpoint['id'] ? 'opacity-100 ring-1 ring-offset-1 ring-[var(--primary-color)]/20' : '' }}" />
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <div class="text-sm font-medium truncate {{ $selectedId === $endpoint['id'] ? 'text-[var(--primary-color)]' : 'text-gray-700 group-hover:text-gray-900' }}">
+                                    <div class="text-sm font-medium truncate flex items-center {{ $selectedId === $endpoint['id'] ? 'text-[var(--primary-color)]' : 'text-gray-700 group-hover:text-gray-900' }}">
                                         {{ $endpoint['name'] ?: $endpoint['uri'] }}
+                                        @if($endpoint['auth_required'] ?? false)
+                                            <svg class="w-3.5 h-3.5 ml-1.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                                        @endif
                                     </div>
                                     @if($endpoint['name'])
                                         <div class="text-xs text-gray-500 font-mono truncate mt-1 group-hover:text-gray-600">{{ $endpoint['uri'] }}</div>
@@ -50,7 +62,12 @@
             <div class="flex-1 overflow-y-auto w-[40%] min-w-[500px]">
                 <div class="p-10 lg:p-14 max-w-3xl xl:max-w-4xl mx-auto">
                     <div class="mb-8">
-                        <h2 class="text-3xl font-bold text-gray-900 tracking-tight">{{ $this->selectedEndpoint['name'] ?? $this->selectedEndpoint['uri'] }}</h2>
+                        <h2 class="text-3xl font-bold text-gray-900 tracking-tight flex items-center">
+                            {{ $this->selectedEndpoint['name'] ?? $this->selectedEndpoint['uri'] }}
+                            @if($this->selectedEndpoint['auth_required'] ?? false)
+                                <svg class="w-6 h-6 ml-3 text-gray-400 group-hover:text-gray-500 transition-colors" title="Authentication Required" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                            @endif
+                        </h2>
                         
                         <div class="mt-6 flex items-center space-x-4">
                             @foreach($this->selectedEndpoint['methods'] as $method)
@@ -65,42 +82,127 @@
 
                     @if($this->selectedEndpoint['description'])
                         <div class="prose prose-slate max-w-none text-gray-600 mb-12 border-l-4 border-gray-200 pl-4 py-1">
-                            {{ $this->selectedEndpoint['description'] }}
+                            {!! \Illuminate\Support\Str::markdown($this->selectedEndpoint['description']) !!}
                         </div>
                     @endif
 
-                    @if(!empty($this->selectedEndpoint['parameters']))
-                        <div class="mt-12">
-                            <h3 class="text-xl font-semibold text-gray-900 mb-5 pb-2 border-b border-gray-200 flex items-center">
-                                <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                                Request Parameters
+                    @php
+                        $params = collect($this->selectedEndpoint['parameters'] ?? []);
+                        $pathParams = $params->where('in', 'path');
+                        $queryParams = $params->where('in', 'query');
+                        $bodyParams = $params->where('in', 'body');
+                    @endphp
+
+                    @if($params->isNotEmpty())
+                        <div class="mt-12 space-y-10">
+                            @foreach([
+                                'Path Variables' => $pathParams,
+                                'Query Parameters' => $queryParams,
+                                'Body Data' => $bodyParams
+                            ] as $sectionTitle => $sectionParams)
+                                @if($sectionParams->isNotEmpty())
+                                    <div>
+                                        <h3 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
+                                            @if($sectionTitle === 'Path Variables')
+                                                <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                            @elseif($sectionTitle === 'Query Parameters')
+                                                <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            @else
+                                                <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                                            @endif
+                                            {{ $sectionTitle }}
+                                        </h3>
+                                        <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                                            <table class="w-full text-left text-sm">
+                                                <thead class="bg-gray-50 border-b border-gray-200">
+                                                    <tr>
+                                                        <th class="px-5 py-3.5 font-semibold text-gray-700 w-1/3">Name</th>
+                                                        <th class="px-5 py-3.5 font-semibold text-gray-700 w-1/4">Type</th>
+                                                        <th class="px-5 py-3.5 font-semibold text-gray-700">Description & Rules</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-gray-100 bg-white">
+                                                    @foreach($sectionParams as $parameter)
+                                                    <tr class="hover:bg-gray-50/50 transition-colors group">
+                                                        <td class="px-5 py-4 align-top">
+                                                            <div class="font-mono text-gray-900 font-semibold flex items-center">
+                                                                {{ $parameter['name'] }}
+                                                                @if($parameter['required'])
+                                                                    <span class="text-red-500 ml-1.5 text-xs bg-red-50 px-1.5 py-0.5 rounded border border-red-100" title="Required">required</span>
+                                                                @endif
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-5 py-4 text-emerald-600 font-mono text-xs align-top pt-4.5">{{ $parameter['type'] }}</td>
+                                                        <td class="px-5 py-4 text-gray-600 align-top">
+                                                            <div class="prose prose-sm prose-slate max-w-none text-gray-600">
+                                                                @if($parameter['description'] && !str_starts_with($parameter['description'], 'Validation rules:'))
+                                                                    {!! \Illuminate\Support\Str::markdown($parameter['description']) !!}
+                                                                @elseif(!empty($parameter['rules']))
+                                                                    <div class="flex flex-wrap gap-1.5 mt-1">
+                                                                        @foreach($parameter['rules'] as $rule)
+                                                                            @if($rule !== 'required')
+                                                                                <span class="bg-gray-100 text-gray-600 text-[10px] font-mono px-1.5 py-0.5 rounded border border-gray-200">{{ $rule }}</span>
+                                                                            @endif
+                                                                        @endforeach
+                                                                    </div>
+                                                                @else
+                                                                    -
+                                                                @endif
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                    @endif
+                    
+                    @if(!empty($this->selectedEndpoint['responses']))
+                        <div class="mt-12 mb-8">
+                            <h3 class="text-xl font-bold text-gray-900 mb-6 pb-2 border-b border-gray-200 flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                Responses
                             </h3>
-                            <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                                <table class="w-full text-left text-sm">
-                                    <thead class="bg-gray-50 border-b border-gray-200">
-                                        <tr>
-                                            <th class="px-5 py-3.5 font-semibold text-gray-700 w-1/3">Name</th>
-                                            <th class="px-5 py-3.5 font-semibold text-gray-700 w-1/4">Type</th>
-                                            <th class="px-5 py-3.5 font-semibold text-gray-700">Description</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100 bg-white">
-                                        @foreach($this->selectedEndpoint['parameters'] as $parameter)
-                                        <tr class="hover:bg-gray-50/50 transition-colors group">
-                                            <td class="px-5 py-4 align-top">
-                                                <div class="font-mono text-gray-900 font-semibold flex items-center">
-                                                    {{ $parameter['name'] }}
-                                                    @if($parameter['required'])
-                                                        <span class="text-red-500 ml-1.5 text-xs bg-red-50 px-1.5 py-0.5 rounded border border-red-100" title="Required">required</span>
-                                                    @endif
-                                                </div>
-                                            </td>
-                                            <td class="px-5 py-4 text-emerald-600 font-mono text-xs align-top pt-4.5">{{ $parameter['type'] }}</td>
-                                            <td class="px-5 py-4 text-gray-600 align-top">{{ $parameter['description'] ?? '-' }}</td>
-                                        </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
+                            <div class="space-y-4">
+                                @foreach($this->selectedEndpoint['responses'] as $response)
+                                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm" x-data="{ open: true }">
+                                        <div @click="open = !open" class="bg-gray-50 px-5 py-3 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors">
+                                            <div class="flex items-center">
+                                                <span class="px-2 py-0.5 text-xs font-bold rounded-md shadow-sm border {{ $response['status'] >= 200 && $response['status'] < 300 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($response['status'] >= 400 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-gray-100 text-gray-700 border-gray-200') }}">
+                                                    {{ $response['status'] }}
+                                                </span>
+                                                <span class="ml-3 text-sm font-semibold text-gray-700">{{ $response['description'] }}</span>
+                                            </div>
+                                            <svg class="w-4 h-4 text-gray-400 transform transition-transform" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                        </div>
+                                        @if(!empty($response['schema']))
+                                            <div class="bg-slate-900 overflow-x-auto text-[13px] font-mono p-5" x-show="open" x-collapse>
+                                                @php
+                                                    $generateExample = function($schema) use (&$generateExample) {
+                                                        if (isset($schema['example'])) return $schema['example'];
+                                                        if ($schema['type'] === 'array' && isset($schema['items'])) {
+                                                            return [$generateExample($schema['items'])];
+                                                        }
+                                                        if ($schema['type'] === 'object' && isset($schema['properties'])) {
+                                                            $obj = [];
+                                                            foreach ($schema['properties'] as $k => $v) {
+                                                                $obj[$k] = $generateExample($v);
+                                                            }
+                                                            return $obj;
+                                                        }
+                                                        return null;
+                                                    };
+                                                    $exampleData = $generateExample($response['schema']);
+                                                @endphp
+                                                <pre><code class="text-slate-300">{!! json_encode($exampleData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!}</code></pre>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
                             </div>
                         </div>
                     @endif
@@ -108,16 +210,20 @@
             </div>
 
             <!-- Right Column: Try It Out -->
-            <div class="w-[45%] lg:w-[480px] xl:w-[500px] flex-shrink-0 bg-[#0f111a] overflow-y-auto border-l border-slate-800 flex flex-col shadow-2xl z-20">
+            <div class="w-[45%] lg:w-[480px] xl:w-[500px] flex-shrink-0 bg-[#0f111a] overflow-y-auto border-l border-slate-800 flex flex-col shadow-2xl z-20" x-data="{ rightTab: 'try', snippetLang: 'curl' }">
                 <div class="p-8">
-                    <h3 class="text-lg font-semibold text-white mb-6 flex items-center justify-between pb-3 border-b border-white/10">
-                        <span class="flex items-center">
-                            <svg class="w-5 h-5 mr-2 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div class="flex items-center space-x-6 mb-6 pb-px border-b border-white/10 font-semibold text-sm">
+                        <button @click="rightTab = 'try'" :class="rightTab === 'try' ? 'text-white border-b-2 border-[var(--primary-color)]' : 'text-slate-500 hover:text-slate-300'" class="pb-3 -mb-[2px] transition-colors focus:outline-none flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             Try it out
-                        </span>
-                    </h3>
+                        </button>
+                        <button @click="rightTab = 'code'" :class="rightTab === 'code' ? 'text-white border-b-2 border-[var(--primary-color)]' : 'text-slate-500 hover:text-slate-300'" class="pb-3 -mb-[2px] transition-colors focus:outline-none flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                            Code Snippet
+                        </button>
+                    </div>
 
-                    <div class="space-y-6">
+                    <div class="space-y-6" x-show="rightTab === 'try'">
                         <!-- Authentication Toggle -->
                         <div class="bg-slate-800/40 rounded-xl p-5 border border-slate-700/50 shadow-inner">
                             <div class="flex items-center justify-between">
@@ -184,6 +290,55 @@
                             <x-api-doc::response :response="$response" />
                         @endif
                     </div>
+                    
+                    <!-- Code Snippets Tab -->
+                    <div class="space-y-6" x-show="rightTab === 'code'" x-cloak>
+                        @php
+                            $smMethod = $this->selectedEndpoint['methods'][0] ?? 'GET';
+                            $smUri = str_starts_with($this->selectedEndpoint['uri'], '/') ? $this->selectedEndpoint['uri'] : '/' . $this->selectedEndpoint['uri'];
+                            $smUrl = rtrim(url('/'), '/') . $smUri;
+                        @endphp
+                        
+                        <div class="flex space-x-2">
+                            <button @click="snippetLang = 'curl'" :class="snippetLang === 'curl' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">cURL</button>
+                            <button @click="snippetLang = 'javascript'" :class="snippetLang === 'javascript' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">JavaScript</button>
+                            <button @click="snippetLang = 'php'" :class="snippetLang === 'php' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">PHP</button>
+                        </div>
+                        
+                        <div class="bg-[#0b0f19] rounded-xl border border-slate-800 p-4 font-mono text-[13px] text-slate-300 overflow-x-auto shadow-inner relative group/copy">
+                            <button x-on:click="navigator.clipboard.writeText($refs[snippetLang].innerText)" class="absolute top-3 right-3 p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded opacity-0 group-hover/copy:opacity-100 transition-opacity" title="Copy to clipboard">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            </button>
+                            <!-- cURL -->
+                            <div x-show="snippetLang === 'curl'" x-ref="curl">
+<pre>curl --request {{ $smMethod }} \
+  --url {{ $smUrl }} \
+  --header 'Accept: application/json'</pre>
+                            </div>
+                            
+                            <!-- JavaScript -->
+                            <div x-show="snippetLang === 'javascript'" x-ref="javascript">
+<pre>fetch('{{ $smUrl }}', {
+  method: '{{ $smMethod }}',
+  headers: {
+    'Accept': 'application/json'
+  }
+})
+  .then(response => response.json())
+  .then(response => console.log(response))
+  .catch(err => console.error(err));</pre>
+                            </div>
+                            
+                            <!-- PHP -->
+                            <div x-show="snippetLang === 'php'" x-ref="php">
+<pre>$response = Http::withHeaders([
+    'Accept' => 'application/json',
+])->{{ strtolower($smMethod) }}('{{ $smUrl }}');
+
+return $response->json();</pre>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         @else
@@ -196,6 +351,12 @@
                         </div>
                         <h2 class="text-4xl font-extrabold text-gray-900 tracking-tight mb-4">{{ config('laravel-api-doc.ui.title') }}</h2>
                         <p class="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">Welcome to the interactive API documentation. Explore all available endpoints, required parameters, and test API requests live from this dashboard.</p>
+                        <div class="mt-8 flex justify-center">
+                            <a href="{{ route('laravel-api-doc.json') }}" target="_blank" class="inline-flex items-center px-6 py-3 border border-transparent shadow-md text-sm font-semibold rounded-full text-white bg-slate-900 hover:bg-slate-800 transition-colors">
+                                <svg class="w-5 h-5 mr-2 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                                OpenAPI Specification
+                            </a>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
