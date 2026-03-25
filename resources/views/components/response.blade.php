@@ -15,16 +15,17 @@
         </div>
     </div>
     
-    <div class="bg-slate-900 rounded-xl border border-white/5 overflow-hidden" x-data="{ responseTab: 'body' }">
-        <div class="flex items-center px-2 pt-1 border-b border-slate-800 bg-slate-900/80 space-x-1">
-            <button @click="responseTab = 'body'" :class="responseTab === 'body' ? 'text-white border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'" class="px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase transition-colors focus:outline-none -mb-px">Body</button>
-            <button @click="responseTab = 'headers'" :class="responseTab === 'headers' ? 'text-white border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'" class="px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase transition-colors focus:outline-none -mb-px">Headers</button>
+    <div class="bg-zinc-950/80 backdrop-blur-md rounded-xl border border-white/5 overflow-hidden shadow-[0_0_15px_-3px_rgba(0,0,0,0.5)]" x-data="{ responseTab: 'body' }">
+        <div class="flex items-center px-2 pt-1 border-b border-white/5 bg-black/50 space-x-1">
+            <button @click="responseTab = 'body'" :class="responseTab === 'body' ? 'text-white border-b-2 border-[var(--primary-color)]' : 'text-slate-400 hover:text-slate-200'" class="px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase transition-colors focus:outline-none -mb-px">Body</button>
+            <button @click="responseTab = 'headers'" :class="responseTab === 'headers' ? 'text-white border-b-2 border-[var(--primary-color)]' : 'text-slate-400 hover:text-slate-200'" class="px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase transition-colors focus:outline-none -mb-px">Headers</button>
         </div>
         
-        <div class="bg-black/40 min-h-[100px]">
+        <div class="bg-black/60 min-h-[100px] shadow-inner">
             <!-- Body Tab -->
             <div x-show="responseTab === 'body'" class="w-full">
-                <pre class="p-4 overflow-x-auto text-[13px] font-mono text-slate-300 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"><code>{{ is_array($response['body'] ?? null) ? json_encode($response['body'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : ($response['body'] ?? '') }}</code></pre>
+                @php $responseBodyStr = is_array($response['body'] ?? null) ? json_encode($response['body'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : ($response['body'] ?? ''); @endphp
+                <pre wire:key="resp-body-{{ md5($responseBodyStr) }}" class="p-4 overflow-x-auto text-[13px] font-mono text-slate-300 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"><code class="language-json" x-init="hljs.highlightElement($el)">{{ $responseBodyStr }}</code></pre>
             </div>
             
             <!-- Headers Tab -->

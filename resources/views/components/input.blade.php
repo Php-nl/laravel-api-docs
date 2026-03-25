@@ -2,11 +2,11 @@
 
 @php
 $isDark = $theme === 'dark';
-$labelClass = $isDark ? 'text-gray-300' : 'text-gray-700';
-$descClass = $isDark ? 'text-gray-400' : 'text-gray-500';
+$labelClass = $isDark ? 'text-slate-300' : 'text-slate-700';
+$descClass = $isDark ? 'text-slate-400' : 'text-slate-500';
 $inputClass = $isDark 
-    ? 'bg-slate-800 border-slate-700 text-white focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] placeholder-slate-500'
-    : 'bg-white border-gray-300 text-gray-900 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] placeholder-gray-400';
+    ? 'bg-black/20 border-white/10 text-white focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] placeholder-slate-600 shadow-inner'
+    : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] placeholder-slate-400 shadow-sm';
 @endphp
 
 <div class="mb-4">

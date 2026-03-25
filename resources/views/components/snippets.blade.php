@@ -28,29 +28,30 @@
 @endphp
 
 <div class="flex space-x-2">
-    <button @click="snippetLang = 'curl'" :class="snippetLang === 'curl' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">cURL</button>
-    <button @click="snippetLang = 'javascript'" :class="snippetLang === 'javascript' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">JavaScript</button>
-    <button @click="snippetLang = 'php'" :class="snippetLang === 'php' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">PHP</button>
-    <button @click="snippetLang = 'python'" :class="snippetLang === 'python' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">Python</button>
+    <button @click="snippetLang = 'curl'" :class="snippetLang === 'curl' ? 'bg-white/10 text-white border-white/10 shadow-sm backdrop-blur-sm' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-all focus:outline-none">cURL</button>
+    <button @click="snippetLang = 'javascript'" :class="snippetLang === 'javascript' ? 'bg-white/10 text-white border-white/10 shadow-sm backdrop-blur-sm' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-all focus:outline-none">JavaScript</button>
+    <button @click="snippetLang = 'php'" :class="snippetLang === 'php' ? 'bg-white/10 text-white border-white/10 shadow-sm backdrop-blur-sm' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-all focus:outline-none">PHP</button>
+    <button @click="snippetLang = 'python'" :class="snippetLang === 'python' ? 'bg-white/10 text-white border-white/10 shadow-sm backdrop-blur-sm' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-all focus:outline-none">Python</button>
 </div>
 
-<div class="bg-[#0b0f19] rounded-xl border border-slate-800 p-4 font-mono text-[13px] text-slate-300 overflow-x-auto shadow-inner relative group/copy mt-4">
-    <button x-on:click="navigator.clipboard.writeText($refs[snippetLang].innerText)" class="absolute top-3 right-3 p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded opacity-0 group-hover/copy:opacity-100 transition-opacity" title="Copy to clipboard">
+<div class="bg-black/60 rounded-xl border border-white/5 p-4 font-mono text-[13px] text-slate-300 overflow-x-auto shadow-inner relative group/copy mt-4 transition-colors">
+    <button @click="navigator.clipboard.writeText($refs[snippetLang].innerText); let text = $el.querySelector('.btn-text'); let old = text.innerHTML; text.innerHTML = 'Copied!'; text.classList.remove('opacity-0', 'scale-90'); text.classList.add('opacity-100', 'scale-100', 'text-emerald-400'); setTimeout(() => { text.innerHTML = ''; text.classList.add('opacity-0', 'scale-90'); text.classList.remove('opacity-100', 'scale-100', 'text-emerald-400'); }, 2000)" class="absolute top-3 right-3 p-1.5 bg-white/5 border border-white/10 text-slate-400 hover:text-white rounded shadow-sm opacity-0 group-hover/copy:opacity-100 transition-all focus:outline-none flex items-center group/btn hover:bg-white/10 backdrop-blur-md" title="Copy to clipboard">
+        <span class="btn-text text-[10px] font-sans font-bold uppercase tracking-widest mr-1.5 opacity-0 scale-90 transition-all absolute right-full mr-2 bg-slate-800 text-white px-2 py-1 rounded pointer-events-none"></span>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
     </button>
     
     <!-- cURL -->
     <div x-show="snippetLang === 'curl'" x-ref="curl">
-<pre>curl --request {{ $smMethod }} \
+<pre wire:key="curl-{{ md5($smUrl . $bodyJson . $smMethod) }}"><code class="language-bash" x-init="hljs.highlightElement($el)">curl --request {{ $smMethod }} \
   --url "{{ $smUrl }}" \
   --header 'Accept: application/json'@if($bodyJson !== '') \
   --header 'Content-Type: application/json' \
-  --data '{!! addslashes($bodyJson) !!}'@endif</pre>
+  --data '{!! addslashes($bodyJson) !!}'@endif</code></pre>
     </div>
     
     <!-- JavaScript -->
     <div x-show="snippetLang === 'javascript'" x-ref="javascript" x-cloak>
-<pre>fetch('{{ $smUrl }}', {
+<pre wire:key="js-{{ md5($smUrl . $bodyJson . $smMethod) }}"><code class="language-javascript" x-init="hljs.highlightElement($el)">fetch('{{ $smUrl }}', {
   method: '{{ $smMethod }}',
   headers: {
     'Accept': 'application/json'@if($bodyJson !== ''),
@@ -62,21 +63,21 @@
 })
   .then(response => response.json())
   .then(response => console.log(response))
-  .catch(err => console.error(err));</pre>
+  .catch(err => console.error(err));</code></pre>
     </div>
     
     <!-- PHP -->
     <div x-show="snippetLang === 'php'" x-ref="php" x-cloak>
-<pre>$response = Http::withHeaders([
+<pre wire:key="php-{{ md5($smUrl . $bodyJson . $smMethod) }}"><code class="language-php" x-init="hljs.highlightElement($el)">$response = Http::withHeaders([
     'Accept' => 'application/json',
 ])@if($bodyJson !== '')->withBody('{!! addslashes($bodyJson) !!}', 'application/json')@endif->{{ strtolower($smMethod) }}('{{ $smUrl }}');
 
-return $response->json();</pre>
+return $response->json();</code></pre>
     </div>
 
     <!-- Python -->
     <div x-show="snippetLang === 'python'" x-ref="python" x-cloak>
-<pre>import requests
+<pre wire:key="py-{{ md5($smUrl . $bodyJson . $smMethod) }}"><code class="language-python" x-init="hljs.highlightElement($el)">import requests
 @if($bodyJson !== '')import json
 @endif
 
@@ -98,6 +99,6 @@ response = requests.request(
 
 )
 
-print(response.json())</pre>
+print(response.json())</code></pre>
     </div>
 </div>

@@ -154,6 +154,22 @@ final class Dashboard extends Component
     }
 
     /**
+     * Go to the home dashboard.
+     */
+    public function goHome(): void
+    {
+        $this->selectedId = null;
+        $this->selectedSchemaId = null;
+        $this->selectedPageId = null;
+        $this->response = null;
+        $this->tryItOutForm = [
+            'query' => [],
+            'body' => [],
+            'path' => [],
+        ];
+    }
+
+    /**
      * Select an endpoint.
      */
     public function selectEndpoint(string $id): void
