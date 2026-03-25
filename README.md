@@ -15,13 +15,20 @@
 
 **Laravel API Doc** is an elegant, zero-configuration API documentation package designed to give your Laravel projects a beautiful, Stoplight Elements-inspired interactive dashboard out of the box. 
 
-It automatically parses your routes, form requests, and parameters to generate a live, testable documentation portal where you and your team can try out endpoints seamlessly.
+It automatically parses your routes, form requests, and models to generate a live, testable documentation portal exactly when you need it.
 
 ## ✨ Features
 
 - **Beautiful UI:** A premium, fully responsive 3-column layout built with Livewire and Tailwind CSS.
 - **Interactive "Try It Out" Panel:** Test any endpoint directly from your browser.
-- **Global Authentication:** Configure Bearer Tokens, Basic Auth, or API Keys directly from the dashboard to authenticate your test requests.
+- **Code Snippets:** Real-time multi-language snippets (cURL, JavaScript, PHP, Python) for your endpoints.
+- **Smart Model Introspection:** Seamlessly infers parameter types via Model casts and DB schema, requiring no docblocks!
+- **Global Authentication:** Configure Bearer Tokens, Basic Auth, or API Keys directly from the dashboard.
+- **OpenAPI Export:** Export your exact API schema compliant with OpenAPI 3.1.0 specification.
+- **API Versioning:** Support version toggles across your endpoints out of the box.
+- **Custom Markdown Pages:** Render extra `.md` documentation files directly in the frontend sidebar.
+- **Real Responses Simulation:** Safely generate real-world JSON response payloads automatically.
+- **Webhooks Documentation:** First-class support for declaring outgoing Webhook payloads.
 - **Auto-Discovery:** Automatically detects endpoints, methods, and route groups.
 - **Zero Config Required:** Just install and visit `/docs/api`!
 
@@ -47,29 +54,39 @@ Once installed, simply navigate to the predefined documentation route in your br
 http://your-app.test/docs/api
 ```
 
-You will be greeted by the API Documentation Dashboard. From here you can:
-1. Browse through your API routes logically grouped by domain.
-2. View the description, parameters, and required payloads for each route.
-3. Use the **Security & Authentication** configuration to authenticate globally.
-4. Execute real-time requests against your application.
-
 ### Defining Endpoints
 
-The package leverages Laravel's native routing metadata and reflection to parse documentation. Standard PHPDoc blocks, FormRequest validations, and route groupings are automatically extracted to document your API.
+The package leverages Laravel's native routing metadata. Standard PHPDoc blocks, `FormRequest` validations, and parameter `Model` bindings are automatically extracted to document your API—no extra packages or plugins needed!
 
 ### Global Authentication
 
 When interacting with private APIs, you don't need to manually enter tokens for every request. 
-On the Welcome Screen of the documentation dashboard, use the **Security & Authentication** panel to define yours:
-- Bearer Token
-- Basic Auth
-- API Key (Header or Query Parameter)
+Use the **Security & Authentication** panel (found on the dashboard's welcome screen) to securely define your tokens locally.
 
-Once set, this authentication state is persisted for your session and can be toggled per-endpoint when running test queries.
+### OpenAPI Export
+
+You can export your documentation to an OpenAPI 3.1.0 compatible `openapi.json` file.
+You can view your schema live at `/docs/api/openapi.json` or generate it via CLI:
+
+```bash
+php artisan api-doc:openapi
+```
+
+### Generating Real Responses
+
+Want to show real JSON responses instead of just schema types? Run the response generator command. It will execute safe GET endpoints to capture live representations of your API returns.
+
+```bash
+php artisan api-doc:generate-responses
+```
+
+### Custom Markdown Pages
+
+You can write standard `.md` Markdown files (e.g. `Getting-Started.md`, `Authentication.md`) and place them in the `resources/docs/api` directory (configurable via `docs_path`). They will be parsed dynamically and explicitly shown in your API sidebar navigation.
 
 ## ⚙️ Configuration
 
-You can fully customize the look and feel, available themes, and base extraction rules by modifying the published configuration file at `config/laravel-api-doc.php`.
+You can fully customize the behavior and look of your documentation by modifying the published configuration file at `config/laravel-api-doc.php`.
 
 ```php
 return [
@@ -78,25 +95,28 @@ return [
         'theme' => [
             'primary_color' => '#3b82f6', // Customize your brand color!
             'background_color' => '#f8fafc',
+            'sidebar_width' => '300px',
         ],
+        'docs_path' => resource_path('docs/api'), // Where your custom .md files live
+    ],
+    'versions' => [
+        'enabled' => true,
+        'default' => 'v1',
+        'list' => [
+            'v1' => 'Version 1',
+            'v2' => 'Version 2',
+        ],
+    ],
+    'webhooks' => [
+        // 'order.created' => \App\Http\Resources\OrderResource::class,
     ],
     // ...
 ];
 ```
 
-## 🧪 Testing
-
-```bash
-composer test
-```
-
 ## 🛠 Contributing
 
 Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
-
-## 🔒 Security Vulnerabilities
-
-If you discover any security-related issues, please email directly instead of using the issue tracker.
 
 ## 📄 License
 

@@ -28,6 +28,18 @@
                 </div>
                 <input wire:model.live.debounce.150ms="search" type="text" placeholder="Search API..." class="w-full pl-9 pr-3 py-2 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 border text-sm rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]/50 focus:border-[var(--primary-color)] transition-all placeholder-slate-400 text-slate-800 dark:text-slate-200">
             </div>
+            @if(config('laravel-api-doc.versions.enabled', false))
+            <div class="mt-3 relative">
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+                <select wire:model.live="selectedVersion" class="w-full pl-4 pr-8 py-2 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 border text-sm rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]/50 focus:border-[var(--primary-color)] transition-all text-slate-800 dark:text-slate-200 appearance-none">
+                    @foreach(config('laravel-api-doc.versions.list', []) as $key => $label)
+                        <option value="{{ $key }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            @endif
             <div class="mt-4">
                 <a href="{{ route('laravel-api-doc.json') }}" target="_blank" class="w-full flex items-center justify-center px-4 py-2 border border-slate-200 dark:border-slate-700 shadow-sm text-xs font-semibold rounded-md text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white transition-colors">
                     <svg class="w-3.5 h-3.5 mr-1.5 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
@@ -36,6 +48,35 @@
             </div>
         </div>
         <div class="flex-1 overflow-y-auto py-4 custom-scrollbar">
+            <!-- Documentation Pages -->
+            @if(count($this->markdownPages) > 0)
+                <div class="mb-6" x-data="{ expanded: true }">
+                    <button @click="expanded = !expanded" class="w-full px-5 mb-2 focus:outline-none group/toggle">
+                        <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center group-hover/toggle:text-slate-700 transition-colors">
+                            <span class="bg-slate-200 h-px flex-1 mr-2 group-hover/toggle:bg-slate-300 transition-colors"></span>
+                            <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span>Documentation</span>
+                            <span class="bg-slate-200 h-px flex-1 ml-2 mr-2 group-hover/toggle:bg-slate-300 transition-colors"></span>
+                            <svg class="w-3.5 h-3.5 transform transition-transform duration-200" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </h2>
+                    </button>
+                    <div class="space-y-0.5 mt-3" x-show="expanded" x-collapse x-cloak>
+                        @foreach($this->markdownPages as $pageId => $page)
+                            @if($search === '' || str_contains(strtolower($page['title']), strtolower($search)))
+                                <button wire:click="selectPage('{{ $pageId }}')" class="w-full text-left px-5 py-2 hover:bg-slate-100/80 transition-all group flex items-center space-x-3 border-l-2 {{ $selectedPageId === $pageId ? 'bg-[var(--primary-color)]/10 border-[var(--primary-color)]' : 'border-transparent' }}">
+                                    <svg class="w-4 h-4 {{ $selectedPageId === $pageId ? 'text-[var(--primary-color)]' : 'text-slate-400 group-hover:text-slate-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5l7 7-7 7"></path></svg>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-[13px] font-semibold truncate flex items-center {{ $selectedPageId === $pageId ? 'text-[var(--primary-color)]' : 'text-slate-700 group-hover:text-slate-900' }}">
+                                            {{ $page['title'] }}
+                                        </div>
+                                    </div>
+                                </button>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             @foreach($this->groups as $group => $endpoints)
                 <div class="mb-6" x-data="{ expanded: {{ collect($endpoints)->contains('id', $selectedId) || $search !== '' ? 'true' : 'false' }} }">
                     <button @click="expanded = !expanded" class="w-full px-5 mb-2 focus:outline-none group/toggle">
@@ -102,7 +143,16 @@
 
     <!-- Main Content Split (Middle and Right) -->
     <div class="flex-1 flex overflow-hidden bg-white dark:bg-slate-900 transition-colors duration-200">
-        @if($this->selectedSchema)
+        @if($this->selectedPage)
+            <!-- Markdown Page Full View -->
+            <div class="flex-1 overflow-y-auto w-full bg-slate-50/30 dark:bg-slate-900/50 transition-colors duration-200 custom-scrollbar">
+                <div class="p-10 lg:p-14 max-w-4xl mx-auto">
+                    <div class="prose prose-slate dark:prose-invert max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-[var(--primary-color)] prose-a:no-underline hover:prose-a:underline prose-img:rounded-xl prose-img:shadow-md">
+                        {!! $this->selectedPage['content'] !!}
+                    </div>
+                </div>
+            </div>
+        @elseif($this->selectedSchema)
             <!-- Schema Full View -->
             <div class="flex-1 overflow-y-auto w-full bg-slate-50/30 dark:bg-slate-900/50 transition-colors duration-200">
                 <div class="p-10 lg:p-14 max-w-5xl mx-auto">
@@ -313,8 +363,14 @@
                                                             Schema
                                                         </button>
                                                         <button @click="responseTab = 'example'" :class="responseTab === 'example' ? 'text-white border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'" class="px-4 py-2 text-[13px] font-bold tracking-wider uppercase transition-colors focus:outline-none -mb-px">
-                                                            Example
+                                                            Mocked Example
                                                         </button>
+                                                        @if(isset($this->realResponses[$this->selectedEndpoint['id']]))
+                                                            <button @click="responseTab = 'real'" :class="responseTab === 'real' ? 'text-emerald-400 border-b-2 border-emerald-500' : 'text-emerald-500/50 hover:text-emerald-400'" class="px-4 py-2 text-[13px] font-bold tracking-wider uppercase transition-colors focus:outline-none -mb-px flex items-center">
+                                                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                                Real Example
+                                                            </button>
+                                                        @endif
                                                     </div>
                                                     
                                                     <!-- Tab Contents -->
@@ -345,6 +401,14 @@
                                                             @endphp
                                                             <pre class="font-mono text-slate-300 p-4 bg-black/40 rounded-lg border border-white/5 overflow-x-auto"><code>{!! json_encode($exampleData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!}</code></pre>
                                                         </div>
+
+                                                        <!-- Real Generated JSON -->
+                                                        @if(isset($this->realResponses[$this->selectedEndpoint['id']]))
+                                                        <div x-show="responseTab === 'real'" x-cloak class="w-full">
+                                                            <pre class="font-mono text-emerald-300 p-4 bg-emerald-950/40 rounded-lg border border-emerald-900/50 overflow-x-auto"><code>{!! json_encode($this->realResponses[$this->selectedEndpoint['id']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!}</code></pre>
+                                                            <div class="mt-2 text-[10px] text-emerald-600 flex justify-end">Automatically generated by running $ php artisan api-doc:generate-responses</div>
+                                                        </div>
+                                                        @endif
                                                     </div>
                                                 </div>
                                             </div>
@@ -438,53 +502,8 @@
                         @endif
                     </div>
                     
-                    <!-- Code Snippets Tab -->
                     <div class="space-y-6" x-show="rightTab === 'code'" x-cloak>
-                        @php
-                            $smMethod = $this->selectedEndpoint['methods'][0] ?? 'GET';
-                            $smUri = str_starts_with($this->selectedEndpoint['uri'], '/') ? $this->selectedEndpoint['uri'] : '/' . $this->selectedEndpoint['uri'];
-                            $smUrl = rtrim(url('/'), '/') . $smUri;
-                        @endphp
-                        
-                        <div class="flex space-x-2">
-                            <button @click="snippetLang = 'curl'" :class="snippetLang === 'curl' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">cURL</button>
-                            <button @click="snippetLang = 'javascript'" :class="snippetLang === 'javascript' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">JavaScript</button>
-                            <button @click="snippetLang = 'php'" :class="snippetLang === 'php' ? 'bg-[#1e293b] text-white border-slate-700' : 'bg-transparent text-slate-500 border-transparent hover:text-slate-300'" class="px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors">PHP</button>
-                        </div>
-                        
-                        <div class="bg-[#0b0f19] rounded-xl border border-slate-800 p-4 font-mono text-[13px] text-slate-300 overflow-x-auto shadow-inner relative group/copy">
-                            <button x-on:click="navigator.clipboard.writeText($refs[snippetLang].innerText)" class="absolute top-3 right-3 p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded opacity-0 group-hover/copy:opacity-100 transition-opacity" title="Copy to clipboard">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                            </button>
-                            <!-- cURL -->
-                            <div x-show="snippetLang === 'curl'" x-ref="curl">
-<pre>curl --request {{ $smMethod }} \
-  --url {{ $smUrl }} \
-  --header 'Accept: application/json'</pre>
-                            </div>
-                            
-                            <!-- JavaScript -->
-                            <div x-show="snippetLang === 'javascript'" x-ref="javascript">
-<pre>fetch('{{ $smUrl }}', {
-  method: '{{ $smMethod }}',
-  headers: {
-    'Accept': 'application/json'
-  }
-})
-  .then(response => response.json())
-  .then(response => console.log(response))
-  .catch(err => console.error(err));</pre>
-                            </div>
-                            
-                            <!-- PHP -->
-                            <div x-show="snippetLang === 'php'" x-ref="php">
-<pre>$response = Http::withHeaders([
-    'Accept' => 'application/json',
-])->{{ strtolower($smMethod) }}('{{ $smUrl }}');
-
-return $response->json();</pre>
-                            </div>
-                        </div>
+                        <x-api-doc::snippets :endpoint="$this->selectedEndpoint" :form="$tryItOutForm" />
                     </div>
                 </div>
             </div>

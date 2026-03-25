@@ -152,6 +152,8 @@ final readonly class FormRequestExtractor implements Extractor
                 ));
             }
         }
+
+        $this->introspectModelFromRequest($className, $endpoint, $in);
     }
 
     /**
@@ -183,5 +185,89 @@ final readonly class FormRequestExtractor implements Extractor
         }
 
         return 'string';
+    }
+
+    /**
+     * Introspect the database schema and model casts to find undocumented fillable properties.
+     *
+     * @param string $requestClass
+     * @param Endpoint $endpoint
+     * @param string $in
+     */
+    private function introspectModelFromRequest(string $requestClass, Endpoint $endpoint, string $in): void
+    {
+        $basename = class_basename($requestClass);
+        $modelName = str_replace(['Store', 'Update', 'Request'], '', $basename);
+        $modelClass = 'App\\Models\\' . $modelName;
+
+        if (!class_exists($modelClass)) {
+            return;
+        }
+
+        try {
+            /** @var \Illuminate\Database\Eloquent\Model $model */
+            $model = new $modelClass();
+            $table = $model->getTable();
+            $fillable = $model->getFillable();
+
+            if (empty($fillable)) {
+                return;
+            }
+
+            $columns = \Illuminate\Support\Facades\Schema::getColumns($table);
+            $dbColumns = [];
+            foreach ($columns as $col) {
+                $dbColumns[$col['name']] = $col;
+            }
+
+            foreach ($fillable as $column) {
+                $exists = false;
+                foreach ($endpoint->parameters as $parameter) {
+                    if ($parameter->name === $column) {
+                        $exists = true;
+                        break;
+                    }
+                }
+
+                if ($exists) {
+                    continue;
+                }
+
+                $type = 'string';
+                $required = false;
+
+                if (isset($dbColumns[$column])) {
+                    $dbTypeStr = strtolower($dbColumns[$column]['type_name'] ?? '');
+                    if (str_contains($dbTypeStr, 'int')) $type = 'integer';
+                    elseif (str_contains($dbTypeStr, 'bool') || str_contains($dbTypeStr, 'tinyint(1)')) $type = 'boolean';
+                    elseif (str_contains($dbTypeStr, 'json')) $type = 'array';
+                    elseif (str_contains($dbTypeStr, 'date')) $type = 'date';
+                    elseif (str_contains($dbTypeStr, 'float') || str_contains($dbTypeStr, 'double') || str_contains($dbTypeStr, 'decimal')) $type = 'number';
+
+                    $required = !($dbColumns[$column]['nullable'] ?? true);
+                }
+
+                $casts = $model->getCasts();
+                if (isset($casts[$column])) {
+                    $cast = strtolower((string)$casts[$column]);
+                    if (str_contains($cast, 'int')) $type = 'integer';
+                    elseif (str_contains($cast, 'bool')) $type = 'boolean';
+                    elseif (str_contains($cast, 'array') || str_contains($cast, 'json')) $type = 'array';
+                    elseif (str_contains($cast, 'date') || str_contains($cast, 'datetime')) $type = 'date';
+                }
+
+                $endpoint->addParameter(new Parameter(
+                    name: $column,
+                    type: $type,
+                    required: $required,
+                    description: 'Auto-extracted from ' . $modelName . ' database schema.',
+                    in: $in,
+                    rules: $required ? ['required'] : [],
+                    enumValues: null
+                ));
+            }
+        } catch (\Throwable) {
+            // Ignore if DB is not reachable or table doesn't exist
+        }
     }
 }

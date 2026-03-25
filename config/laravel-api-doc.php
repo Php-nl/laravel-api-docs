@@ -21,6 +21,24 @@ return [
             'background_color' => '#f8fafc',
             'sidebar_width' => '300px',
         ],
+        'docs_path' => resource_path('docs/api'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | API Versioning
+    |--------------------------------------------------------------------------
+    |
+    | Configure the API versions you want to document and support in the UI.
+    |
+    */
+
+    'versions' => [
+        'enabled' => false,
+        'default' => 'v1',
+        'list' => [
+            'v1' => 'Version 1',
+        ],
     ],
 
     /*
@@ -59,6 +77,20 @@ return [
                 'scheme' => 'bearer',
             ],
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Webhooks Documentation
+    |--------------------------------------------------------------------------
+    |
+    | Define your outgoing webhooks here. The key is the event name, and the
+    | value should be the JsonResource class that represents the payload.
+    |
+    */
+
+    'webhooks' => [
+        // 'order.created' => \App\Http\Resources\OrderResource::class,
     ],
 
     /*

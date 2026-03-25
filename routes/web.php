@@ -13,7 +13,7 @@ Route::group([
     Route::get('/', Dashboard::class)
         ->name('laravel-api-doc.dashboard');
 
-    Route::get('.json', function (\PhpNl\LaravelApiDoc\Extraction\DocumentationManager $manager, \PhpNl\LaravelApiDoc\Services\OpenApiGenerator $openApi) {
+    Route::get('openapi.json', function (\PhpNl\LaravelApiDoc\Extraction\DocumentationManager $manager, \PhpNl\LaravelApiDoc\Services\OpenApiGenerator $openApi) {
         return response()->json($openApi->generate($manager->get()));
     })->name('laravel-api-doc.json');
 });

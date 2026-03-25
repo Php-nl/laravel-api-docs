@@ -41,10 +41,22 @@ final readonly class DocumentationManager
      */
     private function fresh(): array
     {
-        return array_map(
+        $endpoints = array_map(
             fn (Endpoint $endpoint) => $this->endpointToArray($endpoint),
             $this->generator->generate()
         );
+
+        $webhooksConfig = config('laravel-api-doc.webhooks', []);
+        if (!empty($webhooksConfig)) {
+            $webhookExtractor = new \PhpNl\LaravelApiDoc\Extraction\Webhooks\WebhookExtractor();
+            $webhooks = array_map(
+                fn (Endpoint $endpoint) => $this->endpointToArray($endpoint),
+                $webhookExtractor->extract($webhooksConfig)
+            );
+            $endpoints = array_merge($endpoints, $webhooks);
+        }
+
+        return $endpoints;
     }
 
     /**

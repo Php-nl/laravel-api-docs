@@ -19,6 +19,12 @@ final class Dashboard extends Component
     /** @var array<string, array<string, mixed>> */
     public array $schemas = [];
 
+    /** @var array<string, array<string, mixed>> */
+    public array $markdownPages = [];
+
+    /** @var array<string, mixed> */
+    public array $realResponses = [];
+
     /** @var string|null */
     #[\Livewire\Attributes\Url(as: 'endpoint', history: true)]
     public ?string $selectedId = null;
@@ -26,6 +32,14 @@ final class Dashboard extends Component
     /** @var string|null */
     #[\Livewire\Attributes\Url(as: 'schema', history: true)]
     public ?string $selectedSchemaId = null;
+    
+    /** @var string|null */
+    #[\Livewire\Attributes\Url(as: 'page', history: true)]
+    public ?string $selectedPageId = null;
+
+    /** @var string|null */
+    #[\Livewire\Attributes\Url(as: 'version', history: true)]
+    public ?string $selectedVersion = null;
 
     /** @var string */
     public string $search = '';
@@ -72,8 +86,38 @@ final class Dashboard extends Component
      */
     public function mount(\PhpNl\LaravelApiDoc\Extraction\DocumentationManager $manager): void
     {
+        if (config('laravel-api-doc.versions.enabled', false) && !$this->selectedVersion) {
+            $this->selectedVersion = config('laravel-api-doc.versions.default', 'v1');
+        }
+
         $this->endpoints = $manager->get();
         $this->schemas = $this->extractSchemas($this->endpoints);
+        $this->loadMarkdownPages();
+
+        $responsesFile = storage_path('app/api-docs/responses.json');
+        if (\Illuminate\Support\Facades\File::exists($responsesFile)) {
+            $this->realResponses = json_decode(\Illuminate\Support\Facades\File::get($responsesFile), true) ?: [];
+        }
+    }
+
+    private function loadMarkdownPages(): void
+    {
+        $docsPath = config('laravel-api-doc.ui.docs_path', resource_path('docs/api'));
+        
+        if (is_dir($docsPath)) {
+            foreach (\Illuminate\Support\Facades\File::files($docsPath) as $file) {
+                if ($file->getExtension() === 'md') {
+                    $pageId = \Illuminate\Support\Str::slug($file->getFilenameWithoutExtension());
+                    $title = \Illuminate\Support\Str::title(str_replace(['-', '_'], ' ', $file->getFilenameWithoutExtension()));
+                    
+                    $this->markdownPages[$pageId] = [
+                        'id' => $pageId,
+                        'title' => $title,
+                        'content' => \Illuminate\Support\Str::markdown($file->getContents()),
+                    ];
+                }
+            }
+        }
     }
 
     /**
@@ -116,6 +160,7 @@ final class Dashboard extends Component
     {
         $this->selectedId = $id;
         $this->selectedSchemaId = null;
+        $this->selectedPageId = null;
         $this->response = null;
         $this->tryItOutForm = [
             'query' => [],
@@ -247,6 +292,19 @@ final class Dashboard extends Component
     {
         $this->selectedSchemaId = $id;
         $this->selectedId = null;
+        $this->selectedPageId = null;
+        $this->response = null;
+        $this->tryItOutForm = [];
+    }
+
+    /**
+     * Select a markdown page.
+     */
+    public function selectPage(string $id): void
+    {
+        $this->selectedPageId = $id;
+        $this->selectedId = null;
+        $this->selectedSchemaId = null;
         $this->response = null;
         $this->tryItOutForm = [];
     }
@@ -263,14 +321,33 @@ final class Dashboard extends Component
     }
 
     /**
+     * Get the selected markdown page.
+     */
+    public function getSelectedPageProperty(): ?array
+    {
+        if (!$this->selectedPageId) {
+            return null;
+        }
+        return $this->markdownPages[$this->selectedPageId] ?? null;
+    }
+
+    /**
      * Get the filtered endpoints.
      *
      * @return array<string, array<int, array<string, mixed>>>
      */
     public function getGroupsProperty(): array
     {
+        $versionEnabled = config('laravel-api-doc.versions.enabled', false);
+
         return collect($this->endpoints)
             ->filter(fn (array $e) => str_contains(strtolower($e['uri']), strtolower($this->search)))
+            ->filter(function (array $e) use ($versionEnabled) {
+                if (!$versionEnabled || !$this->selectedVersion) return true;
+                
+                return str_contains($e['uri'], '/' . $this->selectedVersion . '/') || 
+                       str_starts_with($e['uri'], $this->selectedVersion . '/');
+            })
             ->groupBy(fn (array $e) => $e['group'] ?? 'Default')
             ->toArray();
     }

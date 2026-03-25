@@ -38,6 +38,8 @@ final class LaravelApiDocServiceProvider extends ServiceProvider
             $this->commands([
                 \PhpNl\LaravelApiDoc\Commands\CacheApiDocCommand::class,
                 \PhpNl\LaravelApiDoc\Commands\ClearApiDocCommand::class,
+                \PhpNl\LaravelApiDoc\Commands\GenerateOpenApiCommand::class,
+                \PhpNl\LaravelApiDoc\Commands\GenerateResponsesCommand::class,
             ]);
         }
 
