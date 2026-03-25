@@ -53,8 +53,12 @@ final readonly class DocumentationManager
      */
     private function endpointToArray(Endpoint $endpoint): array
     {
+        $methodPrefix = strtolower(implode('-', $endpoint->methods));
+        $uriSlug = \Illuminate\Support\Str::slug(str_replace('/', '-', $endpoint->uri));
+        $id = trim($methodPrefix . '-' . $uriSlug, '-');
+
         return [
-            'id' => md5(implode('|', $endpoint->methods) . '|' . $endpoint->uri),
+            'id' => $id,
             'uri' => $endpoint->uri,
             'methods' => $endpoint->methods,
             'name' => $endpoint->name,

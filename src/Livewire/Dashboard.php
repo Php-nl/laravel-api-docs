@@ -20,9 +20,11 @@ final class Dashboard extends Component
     public array $schemas = [];
 
     /** @var string|null */
+    #[\Livewire\Attributes\Url(as: 'endpoint', history: true)]
     public ?string $selectedId = null;
 
     /** @var string|null */
+    #[\Livewire\Attributes\Url(as: 'schema', history: true)]
     public ?string $selectedSchemaId = null;
 
     /** @var string */
