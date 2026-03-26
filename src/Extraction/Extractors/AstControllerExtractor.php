@@ -59,6 +59,10 @@ final readonly class AstControllerExtractor implements Extractor
                 return;
             }
 
+            $traverser = new \PhpParser\NodeTraverser();
+            $traverser->addVisitor(new \PhpParser\NodeVisitor\NameResolver());
+            $ast = $traverser->traverse($ast);
+
             // Find the class method node
             $nodeFinder = new NodeFinder();
             /** @var Node\Stmt\ClassMethod|null $methodNode */
@@ -72,6 +76,7 @@ final readonly class AstControllerExtractor implements Extractor
 
             $this->extractInlineValidation($methodNode, $endpoint);
             $this->extractAbortCalls($methodNode, $endpoint);
+            $this->extractJsonResources($methodNode, $endpoint);
 
         } catch (\Throwable) {
             // Ignore parse errors silently to not interrupt extraction
@@ -229,6 +234,100 @@ final readonly class AstControllerExtractor implements Extractor
                             description: $description,
                         ));
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param Node\Stmt\ClassMethod $methodNode
+     * @param Endpoint $endpoint
+     * @return void
+     */
+    private function extractJsonResources(Node\Stmt\ClassMethod $methodNode, Endpoint $endpoint): void
+    {
+        $nodeFinder = new NodeFinder();
+
+        /** @var Node\Expr\StaticCall[] $staticCalls */
+        $staticCalls = $nodeFinder->findInstanceOf($methodNode, Node\Expr\StaticCall::class);
+
+        foreach ($staticCalls as $call) {
+            if ($call->class instanceof Node\Name && $call->name instanceof Node\Identifier) {
+                $methodName = $call->name->toString();
+                if (in_array($methodName, ['make', 'collection'], true)) {
+                    $className = $call->class->toString();
+                    
+                    if ($className === 'self' || $className === 'static') {
+                        continue;
+                    }
+
+                    // To avoid dependency loops, we can use the same extraction logic from JsonResourceExtractor
+                    $extractor = new JsonResourceExtractor();
+                    
+                    if (!str_contains($className, '\\')) {
+                        // Let's assume it was successfully resolved by the NameResolver if it had a use statement.
+                        // If it's a built-in class or an unresolved relative class in a global namespace, fallback.
+                        $className = "App\\Http\\Resources\\" . $className;
+                    }
+                    
+                    if (!class_exists($className)) {
+                        // Check if we can find it in another way or just skip
+                        continue;
+                    }
+                    
+                    if (is_subclass_of($className, \Illuminate\Http\Resources\Json\JsonResource::class)) {
+                        $reflection = new ReflectionMethod($extractor, 'extractSchema');
+                        $reflection->setAccessible(true);
+                        $schema = $reflection->invoke($extractor, $className);
+                        
+                        if ($methodName === 'collection') {
+                            $schema = [
+                                'type' => 'object',
+                                'properties' => [
+                                    'data' => [
+                                        'type' => 'array',
+                                        'items' => $schema,
+                                    ]
+                                ]
+                            ];
+                        }
+                        
+                        $endpoint->addResponse(new Response(
+                            status: 200,
+                            description: "Successful response returning {$className}",
+                            schema: $schema
+                        ));
+                    }
+                }
+            }
+        }
+        
+        // Also check for 'new Resource()'
+        /** @var Node\Expr\New_[] $newCalls */
+        $newCalls = $nodeFinder->findInstanceOf($methodNode, Node\Expr\New_::class);
+        foreach ($newCalls as $call) {
+            if ($call->class instanceof Node\Name) {
+                $className = $call->class->toString();
+                
+                if (!str_contains($className, '\\')) {
+                    $className = "App\\Http\\Resources\\" . $className;
+                }
+                
+                if (!class_exists($className)) {
+                    continue;
+                }
+                
+                if (is_subclass_of($className, \Illuminate\Http\Resources\Json\JsonResource::class)) {
+                    $extractor = new JsonResourceExtractor();
+                    $reflection = new ReflectionMethod($extractor, 'extractSchema');
+                    $reflection->setAccessible(true);
+                    $schema = $reflection->invoke($extractor, $className);
+                    
+                    $endpoint->addResponse(new Response(
+                        status: 200,
+                        description: "Successful response returning {$className}",
+                        schema: $schema
+                    ));
                 }
             }
         }

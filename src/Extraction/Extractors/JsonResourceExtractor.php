@@ -41,12 +41,31 @@ final readonly class JsonResourceExtractor implements Extractor
 
         $reflection = new ReflectionMethod($controller, $method);
         $returnType = $reflection->getReturnType();
+        $className = null;
 
-        if (!$returnType instanceof ReflectionNamedType) {
-            return;
+        if ($returnType instanceof ReflectionNamedType) {
+            $className = $returnType->getName();
         }
 
-        $className = $returnType->getName();
+        $docBlock = $reflection->getDocComment() ?: '';
+
+        if (!$className || (!is_subclass_of($className, JsonResource::class) && $className !== \Illuminate\Http\Resources\Json\AnonymousResourceCollection::class)) {
+            if (preg_match('/(?:@return|@response)\s+([A-Za-z0-9_\\\\]+)(?:<([A-Za-z0-9_\\\\]+)>)?/', $docBlock, $matches)) {
+                $potentialClass = ltrim($matches[1], '\\');
+                if (!str_contains($potentialClass, '\\') && !class_exists($potentialClass)) {
+                    // Try to guess namespace if not absolute
+                    $potentialClass = "App\\Http\\Resources\\" . $potentialClass;
+                }
+                
+                if (class_exists($potentialClass) && (is_subclass_of($potentialClass, JsonResource::class) || $potentialClass === \Illuminate\Http\Resources\Json\AnonymousResourceCollection::class)) {
+                    $className = $potentialClass;
+                }
+            }
+        }
+
+        if (!$className) {
+            return;
+        }
 
         if (is_subclass_of($className, JsonResource::class) || $className === \Illuminate\Http\Resources\Json\AnonymousResourceCollection::class) {
             
