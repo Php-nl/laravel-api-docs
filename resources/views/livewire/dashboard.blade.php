@@ -1,9 +1,10 @@
 <div x-data="{ 
         rightTab: 'try', 
         snippetLang: 'curl',
-        darkMode: localStorage.getItem('apiDocDarkMode') === 'true'
+        darkMode: localStorage.getItem('apiDocDarkMode') === 'true',
+        rightSidebarOpen: localStorage.getItem('apiDocRightSidebarOpen') !== 'false'
      }" 
-     x-init="$watch('darkMode', val => localStorage.setItem('apiDocDarkMode', val))"
+     x-init="$watch('darkMode', val => localStorage.setItem('apiDocDarkMode', val)); $watch('rightSidebarOpen', val => localStorage.setItem('apiDocRightSidebarOpen', val))"
      :class="{ 'dark': darkMode }"
      class="flex h-screen overflow-hidden font-sans antialiased text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 transition-colors duration-200">
     
@@ -214,6 +215,17 @@
             <div class="flex-1 overflow-y-auto w-[40%] min-w-[500px] border-r border-slate-200 dark:border-white/5 transition-colors duration-200 relative custom-scrollbar">
                 <!-- Soft Glow Background for middle pane -->
                 <div class="absolute top-0 inset-x-0 h-[500px] bg-gradient-to-b from-indigo-500/5 to-transparent pointer-events-none"></div>
+                
+                <!-- Toggle Right Sidebar Button -->
+                <button @click="rightSidebarOpen = !rightSidebarOpen" 
+                        class="absolute top-6 right-6 lg:top-8 lg:right-8 z-50 p-2 rounded-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-slate-700/50 shadow-sm text-slate-500 hover:text-[var(--primary-color)] dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none transition-all group lg:p-2.5"
+                        title="Toggle Interactive Panel">
+                    <!-- Icon for when open (Hide Panel) -->
+                    <svg x-show="rightSidebarOpen" class="w-5 h-5 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+                    <!-- Icon for when closed (Show Panel) -->
+                    <svg x-show="!rightSidebarOpen" x-cloak class="w-5 h-5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+                </button>
+
                 <div class="p-10 lg:p-14 max-w-3xl xl:max-w-4xl mx-auto">
                     <div class="mb-8">
                         <h2 class="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center">
@@ -429,7 +441,8 @@
             </div>
 
             <!-- Right Column: Try It Out -->
-            <div class="w-[45%] lg:w-[480px] xl:w-[500px] flex-shrink-0 bg-zinc-950 overflow-y-auto border-l border-white/5 flex flex-col shadow-2xl z-20 relative custom-scrollbar" x-data="{ rightTab: 'try', snippetLang: 'curl' }">
+            <div x-show="rightSidebarOpen"
+                 class="w-[45%] lg:w-[480px] xl:w-[500px] flex-shrink-0 bg-zinc-950 overflow-y-auto border-l border-white/5 flex flex-col shadow-2xl z-20 relative custom-scrollbar" x-data="{ rightTab: 'try', snippetLang: 'curl' }">
                 <!-- Right pane subtle glow -->
                 <div class="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-transparent pointer-events-none"></div>
                 <div class="p-8">
