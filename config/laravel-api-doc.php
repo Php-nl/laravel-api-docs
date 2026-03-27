@@ -54,9 +54,21 @@ return [
         'include' => [
             'api/*',
         ],
+
+        // Exclude routes by URI pattern
         'exclude' => [
             'api/internal/*',
         ],
+
+        // Exclude routes by route name pattern (e.g. 'admin.*')
+        'exclude_names' => [],
+
+        // Exclude routes by assigned middleware (e.g. 'auth:admin')
+        'exclude_middleware' => [],
+
+        // Note: You can also use the #[PhpNl\LaravelApiDoc\Attributes\ExcludeFromDocs]
+        // attribute directly on your controller classes or methods to exclude them.
+
         'middleware_filters' => [],
     ],
 
