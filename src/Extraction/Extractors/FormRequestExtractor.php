@@ -13,6 +13,18 @@ use Illuminate\Validation\Rules\In;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
 use PhpNl\LaravelApiDoc\Data\Parameter;
 use PhpNl\LaravelApiDoc\Extraction\SchemaRegistry;
+use PhpParser\Node;
+use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\ArrayItem;
+use PhpParser\Node\Expr\ClassConstFetch;
+use PhpParser\Node\Identifier;
+use PhpParser\Node\Scalar\String_;
+use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Return_;
+use PhpParser\NodeFinder;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
+use PhpParser\ParserFactory;
 use ReflectionMethod;
 use ReflectionNamedType;
 
@@ -69,7 +81,11 @@ final readonly class FormRequestExtractor implements Extractor
             return;
         }
 
-        $rules = $formRequest->rules();
+        try {
+            $rules = $formRequest->rules();
+        } catch (\Throwable) {
+            $rules = $this->extractRulesFromAstFallback($className);
+        }
 
         $in = 'query';
         if (array_intersect(['POST', 'PUT', 'PATCH'], $endpoint->methods)) {
@@ -191,6 +207,111 @@ final readonly class FormRequestExtractor implements Extractor
 
         // Also register the full form request as a Schema
         $this->registerSchema($className, $addedParameters);
+    }
+
+    /**
+     * Fallback to AST parsing if the FormRequest fails to instantiate dynamically.
+     *
+     * @return array<string, mixed>
+     */
+    private function extractRulesFromAstFallback(string $className): array
+    {
+        try {
+            $reflection = new \ReflectionClass($className);
+            $fileName = $reflection->getFileName();
+
+            if (! $fileName || ! file_exists($fileName)) {
+                return [];
+            }
+
+            $code = file_get_contents($fileName);
+            if ($code === false) {
+                return [];
+            }
+
+            $parser = (new ParserFactory)->createForNewestSupportedVersion();
+            $ast = $parser->parse($code);
+
+            if (! $ast) {
+                return [];
+            }
+
+            $traverser = new NodeTraverser;
+            $traverser->addVisitor(new NameResolver);
+            $ast = $traverser->traverse($ast);
+
+            $nodeFinder = new NodeFinder;
+            /** @var ClassMethod|null $methodNode */
+            $methodNode = $nodeFinder->findFirst($ast, function (Node $node) {
+                return $node instanceof ClassMethod && $node->name->toString() === 'rules';
+            });
+
+            if (! $methodNode instanceof ClassMethod) {
+                return [];
+            }
+
+            $returnStmt = $nodeFinder->findFirstInstanceOf($methodNode, Return_::class);
+
+            if ($returnStmt && $returnStmt->expr instanceof Array_) {
+                return $this->parseAstRulesArray($returnStmt->expr);
+            }
+
+            return [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function parseAstRulesArray(Array_ $arrayNode): array
+    {
+        $rules = [];
+        if (! is_array($arrayNode->items)) {
+            return $rules;
+        }
+
+        foreach ($arrayNode->items as $item) {
+            if (! $item instanceof ArrayItem || ! $item->key) {
+                continue;
+            }
+
+            $key = '';
+            if ($item->key instanceof String_) {
+                $key = $item->key->value;
+            } elseif ($item->key instanceof Identifier) {
+                $key = $item->key->toString();
+            } else {
+                continue;
+            }
+
+            $ruleValues = [];
+            if ($item->value instanceof String_) {
+                $rules[$key] = $item->value->value;
+            } elseif ($item->value instanceof Array_ && is_array($item->value->items)) {
+                foreach ($item->value->items as $ruleItem) {
+                    if ($ruleItem && $ruleItem->value instanceof String_) {
+                        $ruleValues[] = $ruleItem->value->value;
+                    } elseif ($ruleItem && $ruleItem->value instanceof ClassConstFetch) {
+                        try {
+                            $className = $ruleItem->value->class->toString();
+                            if ($className === 'Illuminate\Validation\Rule') {
+                                if ($ruleItem->value->name instanceof Identifier) {
+                                    $ruleValues[] = $ruleItem->value->name->toString();
+                                }
+                            }
+                        } catch (\Throwable) {
+                        }
+                    }
+                }
+                if (! empty($ruleValues)) {
+                    $rules[$key] = implode('|', $ruleValues);
+                }
+            }
+        }
+
+        return $rules;
     }
 
     /**
