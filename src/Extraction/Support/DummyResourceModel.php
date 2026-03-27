@@ -12,8 +12,7 @@ final class DummyResourceModel extends Model
     protected $guarded = [];
 
     /**
-     * @param string $key
-     * @return mixed
+     * @param  string  $key
      */
     public function getAttribute($key): mixed
     {
@@ -29,12 +28,11 @@ final class DummyResourceModel extends Model
             return now()->toIso8601String();
         }
 
-        return $key . '_string';
+        return $key.'_string';
     }
 
     /**
-     * @param string $key
-     * @return bool
+     * @param  string  $key
      */
     public function relationLoaded($key): bool
     {
@@ -42,12 +40,12 @@ final class DummyResourceModel extends Model
     }
 
     /**
-     * @param string $method
-     * @param array<int, mixed> $parameters
+     * @param  string  $method
+     * @param  array<int, mixed>  $parameters
      * @return mixed
      */
     public function __call($method, $parameters)
     {
-        return new self();
+        return new self;
     }
 }

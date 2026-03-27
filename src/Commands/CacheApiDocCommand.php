@@ -18,7 +18,7 @@ final class CacheApiDocCommand extends Command
     public function handle(DocumentationManager $manager): int
     {
         $this->info('Generating API documentation...');
-        
+
         $manager->cache();
 
         $this->info('API documentation cached successfully!');

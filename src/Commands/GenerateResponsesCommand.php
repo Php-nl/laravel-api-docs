@@ -23,14 +23,14 @@ final class GenerateResponsesCommand extends Command
 
         $endpoints = $manager->get();
         $responsesPath = storage_path('app/api-docs');
-        $responsesFile = $responsesPath . '/responses.json';
+        $responsesFile = $responsesPath.'/responses.json';
 
-        if (!File::exists($responsesPath)) {
+        if (! File::exists($responsesPath)) {
             File::makeDirectory($responsesPath, 0755, true);
         }
 
         $existingResponses = [];
-        if (!$this->option('clean') && File::exists($responsesFile)) {
+        if (! $this->option('clean') && File::exists($responsesFile)) {
             $existingResponses = json_decode(File::get($responsesFile), true) ?: [];
         }
 
@@ -42,7 +42,7 @@ final class GenerateResponsesCommand extends Command
             $methods = array_map('strtoupper', $endpoint['methods']);
             $id = $endpoint['id'];
 
-            if (!in_array('GET', $methods, true)) {
+            if (! in_array('GET', $methods, true)) {
                 continue;
             }
 
@@ -60,7 +60,7 @@ final class GenerateResponsesCommand extends Command
             }
 
             $uri = $endpoint['uri'];
-            
+
             // Fill default query parameters
             $queryParams = [];
             foreach ($endpoint['parameters'] as $param) {
@@ -70,7 +70,7 @@ final class GenerateResponsesCommand extends Command
                         if (isset($param['default'])) {
                             $queryParams[$param['name']] = $param['default'];
                         } else {
-                            $queryParams[$param['name']] = match($param['type'] ?? 'string') {
+                            $queryParams[$param['name']] = match ($param['type'] ?? 'string') {
                                 'integer' => 1,
                                 'number' => 1.0,
                                 'boolean' => 'true',
@@ -82,26 +82,28 @@ final class GenerateResponsesCommand extends Command
                 }
             }
 
-            $url = $appUrl . '/' . ltrim($uri, '/');
-            if (!empty($queryParams)) {
-                $url .= '?' . http_build_query($queryParams);
+            $url = $appUrl.'/'.ltrim($uri, '/');
+            if (! empty($queryParams)) {
+                $url .= '?'.http_build_query($queryParams);
             }
 
-            $this->components->task("GET {$url}", function() use ($url, &$existingResponses, $id, &$generatedCount) {
+            $this->components->task("GET {$url}", function () use ($url, &$existingResponses, $id, &$generatedCount) {
                 try {
-                    // Try to fetch it. If the endpoint requires auth, it might return 401. 
+                    // Try to fetch it. If the endpoint requires auth, it might return 401.
                     // That's fine as an example of a "real" failure response.
                     $response = Http::withHeaders(['Accept' => 'application/json'])
-                                    ->timeout(3)
-                                    ->get($url);
+                        ->timeout(3)
+                        ->get($url);
 
                     if ($response->successful()) {
                         $existingResponses[$id] = $response->json() ?? [];
                         $generatedCount++;
+
                         return true;
                     }
                 } catch (\Exception $e) {
                 }
+
                 return false;
             });
         }

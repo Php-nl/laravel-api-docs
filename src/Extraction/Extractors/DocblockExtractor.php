@@ -18,7 +18,7 @@ final readonly class DocblockExtractor implements Extractor
     {
         $action = $route->getAction();
 
-        if (!isset($action['controller']) || !is_string($action['controller'])) {
+        if (! isset($action['controller']) || ! is_string($action['controller'])) {
             return;
         }
 
@@ -29,7 +29,7 @@ final readonly class DocblockExtractor implements Extractor
             $method = '__invoke';
         }
 
-        if (!method_exists($controller, $method)) {
+        if (! method_exists($controller, $method)) {
             return;
         }
 
@@ -64,9 +64,6 @@ final readonly class DocblockExtractor implements Extractor
 
     /**
      * Parse the docblock and populate the endpoint.
-     *
-     * @param string $docComment
-     * @param Endpoint $endpoint
      */
     private function parseDocblock(string $docComment, Endpoint $endpoint): void
     {
@@ -100,7 +97,7 @@ final readonly class DocblockExtractor implements Extractor
                 }
             }
 
-            if (!$exists && $description) {
+            if (! $exists && $description) {
                 $endpoint->addParameter(new Parameter(
                     name: $name,
                     type: $type,

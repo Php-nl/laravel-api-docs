@@ -7,7 +7,7 @@ namespace PhpNl\LaravelApiDoc\Services;
 final class OpenApiGenerator
 {
     /**
-     * @param array<int, array<string, mixed>> $endpoints
+     * @param  array<int, array<string, mixed>>  $endpoints
      * @return array<string, mixed>
      */
     public function generate(array $endpoints): array
@@ -15,11 +15,11 @@ final class OpenApiGenerator
         $paths = [];
 
         foreach ($endpoints as $endpoint) {
-            $uri = '/' . ltrim($endpoint['uri'], '/');
+            $uri = '/'.ltrim($endpoint['uri'], '/');
 
             // OpenAPI uses {param} syntax which Laravel also uses, but we should make sure
             // parameters are correctly grouped.
-            if (!isset($paths[$uri])) {
+            if (! isset($paths[$uri])) {
                 $paths[$uri] = [];
             }
 
@@ -40,22 +40,22 @@ final class OpenApiGenerator
                 'version' => '1.0.0',
             ],
             'servers' => [
-                ['url' => url('/')]
+                ['url' => url('/')],
             ],
             'paths' => (object) $paths,
             'components' => [
                 'securitySchemes' => [
                     'bearerAuth' => [
                         'type' => 'http',
-                        'scheme' => 'bearer'
-                    ]
-                ]
-            ]
+                        'scheme' => 'bearer',
+                    ],
+                ],
+            ],
         ];
     }
 
     /**
-     * @param array<string, mixed> $endpoint
+     * @param  array<string, mixed>  $endpoint
      * @return array<string, mixed>
      */
     private function buildOperation(array $endpoint): array
@@ -77,6 +77,7 @@ final class OpenApiGenerator
         foreach ($endpoint['parameters'] as $parameter) {
             if ($parameter['in'] === 'body') {
                 $bodyParams[] = $parameter;
+
                 continue;
             }
 
@@ -92,7 +93,7 @@ final class OpenApiGenerator
             ];
         }
 
-        if (!empty($bodyParams)) {
+        if (! empty($bodyParams)) {
             $properties = [];
             $required = [];
 
@@ -108,18 +109,18 @@ final class OpenApiGenerator
             }
 
             $operation['requestBody'] = [
-                'required' => !empty($required),
+                'required' => ! empty($required),
                 'content' => [
                     'application/json' => [
                         'schema' => [
                             'type' => 'object',
                             'properties' => (object) $properties,
-                            'required' => !empty($required) ? $required : null,
-                        ]
-                    ]
-                ]
+                            'required' => ! empty($required) ? $required : null,
+                        ],
+                    ],
+                ],
             ];
-            
+
             // Remove null required if empty
             if (empty($required)) {
                 unset($operation['requestBody']['content']['application/json']['schema']['required']);
@@ -136,11 +137,11 @@ final class OpenApiGenerator
                     'description' => $response['description'] ?? 'Response',
                 ];
 
-                if (!empty($response['schema'])) {
+                if (! empty($response['schema'])) {
                     $opResponse['content'] = [
                         'application/json' => [
-                            'schema' => $this->formatSchemaForOpenApi($response['schema'])
-                        ]
+                            'schema' => $this->formatSchemaForOpenApi($response['schema']),
+                        ],
                     ];
                 }
 
@@ -164,7 +165,7 @@ final class OpenApiGenerator
     }
 
     /**
-     * @param array<string, mixed> $schema
+     * @param  array<string, mixed>  $schema
      * @return array<string, mixed>
      */
     private function formatSchemaForOpenApi(array $schema): array

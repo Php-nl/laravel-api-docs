@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace PhpNl\LaravelApiDoc;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
+use PhpNl\LaravelApiDoc\Commands\CacheApiDocCommand;
+use PhpNl\LaravelApiDoc\Commands\ClearApiDocCommand;
+use PhpNl\LaravelApiDoc\Commands\GenerateOpenApiCommand;
+use PhpNl\LaravelApiDoc\Commands\GenerateResponsesCommand;
 use PhpNl\LaravelApiDoc\Livewire\Dashboard;
 
 final class LaravelApiDocServiceProvider extends ServiceProvider
@@ -16,7 +21,7 @@ final class LaravelApiDocServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/laravel-api-doc.php',
+            __DIR__.'/../config/laravel-api-doc.php',
             'laravel-api-doc'
         );
     }
@@ -28,25 +33,25 @@ final class LaravelApiDocServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__ . '/../config/laravel-api-doc.php' => config_path('laravel-api-doc.php'),
+                __DIR__.'/../config/laravel-api-doc.php' => config_path('laravel-api-doc.php'),
             ], 'laravel-api-doc-config');
 
             $this->publishes([
-                __DIR__ . '/../resources/views' => resource_path('views/vendor/laravel-api-doc'),
+                __DIR__.'/../resources/views' => resource_path('views/vendor/laravel-api-doc'),
             ], 'laravel-api-doc-views');
 
             $this->commands([
-                \PhpNl\LaravelApiDoc\Commands\CacheApiDocCommand::class,
-                \PhpNl\LaravelApiDoc\Commands\ClearApiDocCommand::class,
-                \PhpNl\LaravelApiDoc\Commands\GenerateOpenApiCommand::class,
-                \PhpNl\LaravelApiDoc\Commands\GenerateResponsesCommand::class,
+                CacheApiDocCommand::class,
+                ClearApiDocCommand::class,
+                GenerateOpenApiCommand::class,
+                GenerateResponsesCommand::class,
             ]);
         }
 
-        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'laravel-api-doc');
-        $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'laravel-api-doc');
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
 
-        \Illuminate\Support\Facades\Blade::anonymousComponentPath(__DIR__ . '/../resources/views/components', 'api-doc');
+        Blade::anonymousComponentPath(__DIR__.'/../resources/views/components', 'api-doc');
 
         $this->registerLivewireComponents();
     }

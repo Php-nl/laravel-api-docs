@@ -6,33 +6,32 @@ namespace PhpNl\LaravelApiDoc\Extraction\Support;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 final class EloquentSchemaReader
 {
     /**
-     * @param class-string<Model> $modelClass
+     * @param  class-string<Model>  $modelClass
      * @return array<string, mixed>
      */
     public function read(string $modelClass): array
     {
-        if (!class_exists($modelClass)) {
+        if (! class_exists($modelClass)) {
             return [];
         }
 
         try {
             /** @var Model $model */
-            $model = new $modelClass();
+            $model = new $modelClass;
             $table = $model->getTable();
-            
+
             // Requires doctrine/dbal or Laravel 11's native Schema::getColumns()
             $columns = Schema::getColumns($table);
-            
+
             $hidden = $model->getHidden();
             $casts = $model->getCasts();
             // Dates are handled by casts usually in modern Laravel, but just in case
             $dates = $model->getDates();
-            
+
             $schema = [];
 
             foreach ($columns as $column) {
@@ -43,7 +42,7 @@ final class EloquentSchemaReader
                 }
 
                 $type = $this->mapDatabaseType($column['type_name']);
-                
+
                 // Override with cast if exists
                 if (isset($casts[$name])) {
                     $type = $this->mapCastType($casts[$name]);
@@ -66,7 +65,7 @@ final class EloquentSchemaReader
     private function mapDatabaseType(string $dbType): string
     {
         $dbType = strtolower($dbType);
-        
+
         if (str_contains($dbType, 'int')) {
             return 'number';
         }
@@ -95,13 +94,13 @@ final class EloquentSchemaReader
             default => 'string',
         };
     }
-    
+
     private function generateExample(string $name, string $type): mixed
     {
         if ($name === 'id' || str_ends_with($name, '_id')) {
             return 1;
         }
-        
+
         if ($type === 'number') {
             return 100;
         }
@@ -111,7 +110,7 @@ final class EloquentSchemaReader
         if ($type === 'object') {
             return [];
         }
-        
+
         if (str_contains($name, 'email')) {
             return 'user@example.com';
         }
@@ -119,6 +118,6 @@ final class EloquentSchemaReader
             return 'https://example.com';
         }
 
-        return $name . '_string';
+        return $name.'_string';
     }
 }

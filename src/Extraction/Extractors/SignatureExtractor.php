@@ -20,7 +20,7 @@ final readonly class SignatureExtractor implements Extractor
     {
         $action = $route->getAction();
 
-        if (!isset($action['controller']) || !is_string($action['controller'])) {
+        if (! isset($action['controller']) || ! is_string($action['controller'])) {
             return;
         }
 
@@ -31,7 +31,7 @@ final readonly class SignatureExtractor implements Extractor
             $method = '__invoke';
         }
 
-        if (!method_exists($controller, $method)) {
+        if (! method_exists($controller, $method)) {
             return;
         }
 
@@ -48,15 +48,12 @@ final readonly class SignatureExtractor implements Extractor
 
     /**
      * Determine if a parameter should be skipped.
-     *
-     * @param ReflectionParameter $parameter
-     * @return bool
      */
     private function shouldSkip(ReflectionParameter $parameter): bool
     {
         $type = $parameter->getType();
 
-        if (!$type instanceof ReflectionNamedType) {
+        if (! $type instanceof ReflectionNamedType) {
             return false;
         }
 
@@ -68,9 +65,6 @@ final readonly class SignatureExtractor implements Extractor
 
     /**
      * Create a Parameter DTO from a reflection parameter.
-     *
-     * @param ReflectionParameter $parameter
-     * @return Parameter
      */
     private function createParameter(ReflectionParameter $parameter): Parameter
     {
@@ -84,7 +78,7 @@ final readonly class SignatureExtractor implements Extractor
         return new Parameter(
             name: $parameter->getName(),
             type: $type,
-            required: !$parameter->isOptional(),
+            required: ! $parameter->isOptional(),
             default: $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null,
             in: 'path',
         );

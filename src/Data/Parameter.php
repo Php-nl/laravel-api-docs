@@ -6,13 +6,6 @@ namespace PhpNl\LaravelApiDoc\Data;
 
 final readonly class Parameter
 {
-    /**
-     * @param string $name
-     * @param string $type
-     * @param bool $required
-     * @param string|null $description
-     * @param mixed|null $default
-     */
     public function __construct(
         public string $name,
         public string $type,
@@ -22,6 +15,5 @@ final readonly class Parameter
         public string $in = 'query',
         public array $rules = [],
         public ?array $enumValues = null,
-    ) {
-    }
+    ) {}
 }

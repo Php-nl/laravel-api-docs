@@ -20,22 +20,23 @@ final class GenerateOpenApiCommand extends Command
     public function handle(DocumentationManager $manager, OpenApiGenerator $generator): int
     {
         $this->info('Parsing endpoints and generating OpenAPI schema...');
-        
+
         $endpoints = $manager->get();
         $schema = $generator->generate($endpoints);
 
         $json = json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        if (!$json) {
+        if (! $json) {
             $this->error('Failed to encode OpenAPI schema to JSON.');
+
             return self::FAILURE;
         }
 
         $outputPath = $this->option('output') ?: base_path('openapi.json');
-        
+
         File::put($outputPath, $json);
 
-        $this->info('OpenAPI documentation exported successfully to: ' . $outputPath);
+        $this->info('OpenAPI documentation exported successfully to: '.$outputPath);
 
         return self::SUCCESS;
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpNl\LaravelApiDoc\Tests;
 
+use Illuminate\Foundation\Application;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use PhpNl\LaravelApiDoc\LaravelApiDocServiceProvider;
@@ -13,7 +14,7 @@ abstract class TestCase extends Orchestra
     /**
      * Get the package providers.
      *
-     * @param \Illuminate\Foundation\Application $app
+     * @param  Application  $app
      * @return array<int, string>
      */
     protected function getPackageProviders($app): array
@@ -27,7 +28,7 @@ abstract class TestCase extends Orchestra
     /**
      * Define the environment.
      *
-     * @param \Illuminate\Foundation\Application $app
+     * @param  Application  $app
      */
     protected function defineEnvironment($app): void
     {

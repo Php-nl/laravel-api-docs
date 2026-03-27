@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpNl\LaravelApiDoc\Extraction\Webhooks;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Str;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
 use PhpNl\LaravelApiDoc\Data\Response;
 use PhpNl\LaravelApiDoc\Extraction\Support\DummyResourceModel;
@@ -13,7 +14,7 @@ use Throwable;
 final readonly class WebhookExtractor
 {
     /**
-     * @param array<string, string> $webhooks Configured webhooks mapping [event_name => ResourceClass]
+     * @param  array<string, string>  $webhooks  Configured webhooks mapping [event_name => ResourceClass]
      * @return array<int, Endpoint>
      */
     public function extract(array $webhooks): array
@@ -24,7 +25,7 @@ final readonly class WebhookExtractor
             $endpoint = new Endpoint(
                 uri: $event,
                 methods: ['WEBHOOK'],
-                name: \Illuminate\Support\Str::title(str_replace(['.', '_', '-'], ' ', $event)),
+                name: Str::title(str_replace(['.', '_', '-'], ' ', $event)),
                 group: 'Webhooks',
                 description: "Outgoing webhook payload for event: `{$event}`",
                 authRequired: false
@@ -33,7 +34,7 @@ final readonly class WebhookExtractor
             if (class_exists($resourceClass) && is_subclass_of($resourceClass, JsonResource::class)) {
                 $endpoint->addResponse(new Response(
                     status: 200,
-                    description: "Webhook Payload Structure",
+                    description: 'Webhook Payload Structure',
                     schema: $this->extractSchema($resourceClass)
                 ));
             }
@@ -45,14 +46,13 @@ final readonly class WebhookExtractor
     }
 
     /**
-     * @param string $className
      * @return array<string, mixed>
      */
     private function extractSchema(string $className): array
     {
         try {
             /** @var JsonResource $resource */
-            $resource = new $className(new DummyResourceModel());
+            $resource = new $className(new DummyResourceModel);
             $payload = $resource->toArray(request());
 
             return [
@@ -69,7 +69,7 @@ final readonly class WebhookExtractor
     }
 
     /**
-     * @param array<int|string, mixed> $payload
+     * @param  array<int|string, mixed>  $payload
      * @return array<string, mixed>
      */
     private function mapArrayToSchema(array $payload): array
@@ -82,6 +82,7 @@ final readonly class WebhookExtractor
                     'type' => 'object',
                     'properties' => $this->mapArrayToSchema($value->toArray(request())),
                 ];
+
                 continue;
             }
             if ($type === 'array') {
@@ -95,6 +96,7 @@ final readonly class WebhookExtractor
                                 'properties' => $this->mapArrayToSchema($value[0]->toArray(request())),
                             ],
                         ];
+
                         continue;
                     }
                     $schema[$key] = [
@@ -110,6 +112,7 @@ final readonly class WebhookExtractor
                         'properties' => $this->mapArrayToSchema($value),
                     ];
                 }
+
                 continue;
             }
             if (is_object($value)) {
@@ -131,6 +134,7 @@ final readonly class WebhookExtractor
                 'example' => $value,
             ];
         }
+
         return $schema;
     }
 }

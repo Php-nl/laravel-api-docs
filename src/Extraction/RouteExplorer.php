@@ -11,13 +11,9 @@ use Illuminate\Support\Str;
 
 final readonly class RouteExplorer
 {
-    /**
-     * @param Router $router
-     */
     public function __construct(
         private Router $router,
-    ) {
-    }
+    ) {}
 
     /**
      * Explore and filter routes based on configuration.
@@ -38,10 +34,8 @@ final readonly class RouteExplorer
     /**
      * Determine if a route should be included in the documentation.
      *
-     * @param Route $route
-     * @param array<int, string> $includePatterns
-     * @param array<int, string> $excludePatterns
-     * @return bool
+     * @param  array<int, string>  $includePatterns
+     * @param  array<int, string>  $excludePatterns
      */
     private function shouldInclude(Route $route, array $includePatterns, array $excludePatterns): bool
     {
@@ -55,7 +49,7 @@ final readonly class RouteExplorer
             }
         }
 
-        if (!$included) {
+        if (! $included) {
             return false;
         }
 

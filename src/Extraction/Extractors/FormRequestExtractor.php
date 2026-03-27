@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace PhpNl\LaravelApiDoc\Extraction\Extractors;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Routing\Route;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rules\In;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
 use PhpNl\LaravelApiDoc\Data\Parameter;
+use PhpNl\LaravelApiDoc\Extraction\SchemaRegistry;
 use ReflectionMethod;
 use ReflectionNamedType;
 
@@ -20,7 +25,7 @@ final readonly class FormRequestExtractor implements Extractor
     {
         $action = $route->getAction();
 
-        if (!isset($action['controller']) || !is_string($action['controller'])) {
+        if (! isset($action['controller']) || ! is_string($action['controller'])) {
             return;
         }
 
@@ -31,7 +36,7 @@ final readonly class FormRequestExtractor implements Extractor
             $method = '__invoke';
         }
 
-        if (!method_exists($controller, $method)) {
+        if (! method_exists($controller, $method)) {
             return;
         }
 
@@ -40,7 +45,7 @@ final readonly class FormRequestExtractor implements Extractor
         foreach ($reflection->getParameters() as $parameter) {
             $type = $parameter->getType();
 
-            if (!$type instanceof ReflectionNamedType) {
+            if (! $type instanceof ReflectionNamedType) {
                 continue;
             }
 
@@ -54,16 +59,13 @@ final readonly class FormRequestExtractor implements Extractor
 
     /**
      * Extract parameters from a FormRequest class.
-     *
-     * @param string $className
-     * @param Endpoint $endpoint
      */
     private function extractFromFormRequest(string $className, Endpoint $endpoint): void
     {
         /** @var FormRequest $formRequest */
-        $formRequest = new $className();
+        $formRequest = new $className;
 
-        if (!method_exists($formRequest, 'rules')) {
+        if (! method_exists($formRequest, 'rules')) {
             return;
         }
 
@@ -82,44 +84,49 @@ final readonly class FormRequestExtractor implements Extractor
 
             if (is_array($rule)) {
                 foreach ($rule as $r) {
-                    if ($r instanceof \Illuminate\Validation\Rules\Enum) {
+                    if ($r instanceof Enum) {
                         try {
                             $refProperty = new \ReflectionProperty($r, 'type');
                             $refProperty->setAccessible(true);
                             $enumClass = $refProperty->getValue($r);
-                            
+
                             if (function_exists('enum_exists') && enum_exists($enumClass)) {
-                                $enumValues = array_map(fn($case) => $case->value ?? $case->name, $enumClass::cases());
-                                $ruleArray[] = 'enum:' . implode(',', $enumValues);
-                                
-                                \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($enumClass), [
+                                $enumValues = array_map(fn ($case) => $case->value ?? $case->name, $enumClass::cases());
+                                $ruleArray[] = 'enum:'.implode(',', $enumValues);
+
+                                SchemaRegistry::register(class_basename($enumClass), [
                                     'type' => 'string',
                                     'enum' => $enumValues,
                                 ]);
+
                                 continue;
                             }
-                        } catch (\Throwable) {}
+                        } catch (\Throwable) {
+                        }
                     }
-                    
+
                     if (is_string($r) && function_exists('enum_exists') && enum_exists($r)) {
-                        $enumValues = array_map(fn($case) => $case->value ?? $case->name, $r::cases());
-                        $ruleArray[] = 'enum:' . implode(',', $enumValues);
-                        
-                        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($r), [
+                        $enumValues = array_map(fn ($case) => $case->value ?? $case->name, $r::cases());
+                        $ruleArray[] = 'enum:'.implode(',', $enumValues);
+
+                        SchemaRegistry::register(class_basename($r), [
                             'type' => 'string',
                             'enum' => $enumValues,
                         ]);
+
                         continue;
                     }
 
-                    if ($r instanceof \Illuminate\Validation\Rules\In) {
+                    if ($r instanceof In) {
                         try {
                             $refProperty = new \ReflectionProperty($r, 'values');
                             $refProperty->setAccessible(true);
                             $enumValues = $refProperty->getValue($r);
-                            $ruleArray[] = 'in:' . implode(',', $enumValues);
+                            $ruleArray[] = 'in:'.implode(',', $enumValues);
+
                             continue;
-                        } catch (\Throwable) {}
+                        } catch (\Throwable) {
+                        }
                     }
 
                     $ruleArray[] = is_object($r) ? get_class($r) : (string) $r;
@@ -130,10 +137,10 @@ final readonly class FormRequestExtractor implements Extractor
                     if (str_starts_with($r, 'enum:')) {
                         $enumClass = substr($r, 5);
                         if (function_exists('enum_exists') && enum_exists($enumClass)) {
-                            $enumValues = array_map(fn($case) => $case->value ?? $case->name, $enumClass::cases());
-                            $ruleArray[$idx] = 'enum:' . implode(',', $enumValues);
-                            
-                            \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($enumClass), [
+                            $enumValues = array_map(fn ($case) => $case->value ?? $case->name, $enumClass::cases());
+                            $ruleArray[$idx] = 'enum:'.implode(',', $enumValues);
+
+                            SchemaRegistry::register(class_basename($enumClass), [
                                 'type' => 'string',
                                 'enum' => $enumValues,
                             ]);
@@ -157,7 +164,7 @@ final readonly class FormRequestExtractor implements Extractor
                 }
             }
 
-            if (!$exists) {
+            if (! $exists) {
                 $newParameter = new Parameter(
                     name: $name,
                     type: $type,
@@ -181,16 +188,13 @@ final readonly class FormRequestExtractor implements Extractor
         }
 
         $this->introspectModelFromRequest($className, $endpoint, $in, $addedParameters);
-        
+
         // Also register the full form request as a Schema
         $this->registerSchema($className, $addedParameters);
     }
 
     /**
      * Determine the parameter type based on validation rules.
-     *
-     * @param string $rules
-     * @return string
      */
     private function determineType(string $rules): string
     {
@@ -220,24 +224,21 @@ final readonly class FormRequestExtractor implements Extractor
     /**
      * Introspect the database schema and model casts to find undocumented fillable properties.
      *
-     * @param string $requestClass
-     * @param Endpoint $endpoint
-     * @param string $in
-     * @param array<Parameter> &$addedParameters
+     * @param  array<Parameter>  &$addedParameters
      */
     private function introspectModelFromRequest(string $requestClass, Endpoint $endpoint, string $in, array &$addedParameters): void
     {
         $basename = class_basename($requestClass);
         $modelName = str_replace(['Store', 'Update', 'Request'], '', $basename);
-        $modelClass = 'App\\Models\\' . $modelName;
+        $modelClass = 'App\\Models\\'.$modelName;
 
-        if (!class_exists($modelClass)) {
+        if (! class_exists($modelClass)) {
             return;
         }
 
         try {
-            /** @var \Illuminate\Database\Eloquent\Model $model */
-            $model = new $modelClass();
+            /** @var Model $model */
+            $model = new $modelClass;
             $table = $model->getTable();
             $fillable = $model->getFillable();
 
@@ -245,7 +246,7 @@ final readonly class FormRequestExtractor implements Extractor
                 return;
             }
 
-            $columns = \Illuminate\Support\Facades\Schema::getColumns($table);
+            $columns = Schema::getColumns($table);
             $dbColumns = [];
             foreach ($columns as $col) {
                 $dbColumns[$col['name']] = $col;
@@ -269,34 +270,45 @@ final readonly class FormRequestExtractor implements Extractor
 
                 if (isset($dbColumns[$column])) {
                     $dbTypeStr = strtolower($dbColumns[$column]['type_name'] ?? '');
-                    if (str_contains($dbTypeStr, 'int')) $type = 'integer';
-                    elseif (str_contains($dbTypeStr, 'bool') || str_contains($dbTypeStr, 'tinyint(1)')) $type = 'boolean';
-                    elseif (str_contains($dbTypeStr, 'json')) $type = 'array';
-                    elseif (str_contains($dbTypeStr, 'date')) $type = 'date';
-                    elseif (str_contains($dbTypeStr, 'float') || str_contains($dbTypeStr, 'double') || str_contains($dbTypeStr, 'decimal')) $type = 'number';
+                    if (str_contains($dbTypeStr, 'int')) {
+                        $type = 'integer';
+                    } elseif (str_contains($dbTypeStr, 'bool') || str_contains($dbTypeStr, 'tinyint(1)')) {
+                        $type = 'boolean';
+                    } elseif (str_contains($dbTypeStr, 'json')) {
+                        $type = 'array';
+                    } elseif (str_contains($dbTypeStr, 'date')) {
+                        $type = 'date';
+                    } elseif (str_contains($dbTypeStr, 'float') || str_contains($dbTypeStr, 'double') || str_contains($dbTypeStr, 'decimal')) {
+                        $type = 'number';
+                    }
 
-                    $required = !($dbColumns[$column]['nullable'] ?? true);
+                    $required = ! ($dbColumns[$column]['nullable'] ?? true);
                 }
 
                 $casts = $model->getCasts();
                 if (isset($casts[$column])) {
-                    $cast = strtolower((string)$casts[$column]);
-                    if (str_contains($cast, 'int')) $type = 'integer';
-                    elseif (str_contains($cast, 'bool')) $type = 'boolean';
-                    elseif (str_contains($cast, 'array') || str_contains($cast, 'json')) $type = 'array';
-                    elseif (str_contains($cast, 'date') || str_contains($cast, 'datetime')) $type = 'date';
+                    $cast = strtolower((string) $casts[$column]);
+                    if (str_contains($cast, 'int')) {
+                        $type = 'integer';
+                    } elseif (str_contains($cast, 'bool')) {
+                        $type = 'boolean';
+                    } elseif (str_contains($cast, 'array') || str_contains($cast, 'json')) {
+                        $type = 'array';
+                    } elseif (str_contains($cast, 'date') || str_contains($cast, 'datetime')) {
+                        $type = 'date';
+                    }
                 }
 
                 $newParameter = new Parameter(
                     name: $column,
                     type: $type,
                     required: $required,
-                    description: 'Auto-extracted from ' . $modelName . ' database schema.',
+                    description: 'Auto-extracted from '.$modelName.' database schema.',
                     in: $in,
                     rules: $required ? ['required'] : [],
                     enumValues: null
                 );
-                
+
                 $endpoint->addParameter($newParameter);
                 $addedParameters[] = $newParameter;
             }
@@ -306,8 +318,7 @@ final readonly class FormRequestExtractor implements Extractor
     }
 
     /**
-     * @param string $requestClass
-     * @param array<Parameter> $parameters
+     * @param  array<Parameter>  $parameters
      */
     private function registerSchema(string $requestClass, array $parameters): void
     {
@@ -324,7 +335,7 @@ final readonly class FormRequestExtractor implements Extractor
                 $prop['enum'] = $parameter->enumValues;
             }
 
-            if (!empty($parameter->rules)) {
+            if (! empty($parameter->rules)) {
                 $prop['rules'] = $parameter->rules;
 
                 // Add OpenAPI standard constraints
@@ -332,14 +343,22 @@ final readonly class FormRequestExtractor implements Extractor
                     $rule = (string) $rule;
                     if (str_starts_with($rule, 'min:')) {
                         $val = (float) substr($rule, 4);
-                        if ($parameter->type === 'string') $prop['minLength'] = (int) $val;
-                        elseif ($parameter->type === 'number' || $parameter->type === 'integer') $prop['minimum'] = $val;
-                        elseif ($parameter->type === 'array') $prop['minItems'] = (int) $val;
+                        if ($parameter->type === 'string') {
+                            $prop['minLength'] = (int) $val;
+                        } elseif ($parameter->type === 'number' || $parameter->type === 'integer') {
+                            $prop['minimum'] = $val;
+                        } elseif ($parameter->type === 'array') {
+                            $prop['minItems'] = (int) $val;
+                        }
                     } elseif (str_starts_with($rule, 'max:')) {
                         $val = (float) substr($rule, 4);
-                        if ($parameter->type === 'string') $prop['maxLength'] = (int) $val;
-                        elseif ($parameter->type === 'number' || $parameter->type === 'integer') $prop['maximum'] = $val;
-                        elseif ($parameter->type === 'array') $prop['maxItems'] = (int) $val;
+                        if ($parameter->type === 'string') {
+                            $prop['maxLength'] = (int) $val;
+                        } elseif ($parameter->type === 'number' || $parameter->type === 'integer') {
+                            $prop['maximum'] = $val;
+                        } elseif ($parameter->type === 'array') {
+                            $prop['maxItems'] = (int) $val;
+                        }
                     } elseif (str_starts_with($rule, 'size:')) {
                         $val = (float) substr($rule, 5);
                         if ($parameter->type === 'string') {
@@ -392,17 +411,17 @@ final readonly class FormRequestExtractor implements Extractor
             'properties' => $properties,
         ];
 
-        if (!empty($rootRequired)) {
+        if (! empty($rootRequired)) {
             $schema['required'] = array_unique($rootRequired);
         }
 
-        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($requestClass), $schema);
+        SchemaRegistry::register(class_basename($requestClass), $schema);
     }
 
     /**
-     * @param array<string, mixed> &$schema
-     * @param array<int, string> $parts
-     * @param array<string, mixed> $prop
+     * @param  array<string, mixed>  &$schema
+     * @param  array<int, string>  $parts
+     * @param  array<string, mixed>  $prop
      */
     private function applyDotNotation(array &$schema, array $parts, array $prop): void
     {
@@ -421,6 +440,7 @@ final readonly class FormRequestExtractor implements Extractor
                     $schema[$current] = $prop;
                 }
             }
+
             return;
         }
 
@@ -430,10 +450,11 @@ final readonly class FormRequestExtractor implements Extractor
             // No, the parent called `applyDotNotation($schema['items'], ...)`.
             // So if `$current` is '*', we just apply to the current schema directly as the items.
             $this->applyDotNotation($schema, $parts, $prop);
+
             return;
         }
 
-        if (!isset($schema[$current])) {
+        if (! isset($schema[$current])) {
             $next = $parts[0];
             if ($next === '*') {
                 $schema[$current] = [
@@ -455,10 +476,10 @@ final readonly class FormRequestExtractor implements Extractor
                 if (count($parts) === 0) {
                     $schema[$current]['items'] = $prop;
                 } else {
-                    if (!isset($schema[$current]['items']) || !is_array($schema[$current]['items'])) {
+                    if (! isset($schema[$current]['items']) || ! is_array($schema[$current]['items'])) {
                         $schema[$current]['items'] = [];
                     }
-                    if (!isset($schema[$current]['items']['properties']) || !is_array($schema[$current]['items']['properties'])) {
+                    if (! isset($schema[$current]['items']['properties']) || ! is_array($schema[$current]['items']['properties'])) {
                         $schema[$current]['items']['properties'] = [];
                         $schema[$current]['items']['type'] = 'object';
                     }
@@ -466,14 +487,14 @@ final readonly class FormRequestExtractor implements Extractor
                 }
             } else {
                 // Malformed rule, treating as object
-                if (!isset($schema[$current]['properties']) || !is_array($schema[$current]['properties'])) {
+                if (! isset($schema[$current]['properties']) || ! is_array($schema[$current]['properties'])) {
                     $schema[$current]['properties'] = [];
                 }
                 $this->applyDotNotation($schema[$current]['properties'], $parts, $prop);
             }
         } else {
             // Object type
-            if (!isset($schema[$current]['properties']) || !is_array($schema[$current]['properties'])) {
+            if (! isset($schema[$current]['properties']) || ! is_array($schema[$current]['properties'])) {
                 $schema[$current]['properties'] = [];
             }
             $this->applyDotNotation($schema[$current]['properties'], $parts, $prop);

@@ -4,27 +4,26 @@ declare(strict_types=1);
 
 namespace PhpNl\LaravelApiDoc\Extraction\Extractors;
 
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Route;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
 use PhpNl\LaravelApiDoc\Data\Parameter;
 use PhpNl\LaravelApiDoc\Data\Response;
-use PhpParser\NodeFinder;
-use PhpParser\ParserFactory;
+use PhpNl\LaravelApiDoc\Extraction\SchemaRegistry;
 use PhpParser\Node;
+use PhpParser\NodeFinder;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
+use PhpParser\ParserFactory;
 use ReflectionMethod;
 
 final readonly class AstControllerExtractor implements Extractor
 {
-    /**
-     * @param Route $route
-     * @param Endpoint $endpoint
-     * @return void
-     */
     public function extract(Route $route, Endpoint $endpoint): void
     {
         $action = $route->getAction();
 
-        if (!isset($action['controller']) || !is_string($action['controller'])) {
+        if (! isset($action['controller']) || ! is_string($action['controller'])) {
             return;
         }
 
@@ -35,7 +34,7 @@ final readonly class AstControllerExtractor implements Extractor
             $method = '__invoke';
         }
 
-        if (!method_exists($controller, $method)) {
+        if (! method_exists($controller, $method)) {
             return;
         }
 
@@ -43,7 +42,7 @@ final readonly class AstControllerExtractor implements Extractor
             $reflection = new ReflectionMethod($controller, $method);
             $fileName = $reflection->getFileName();
 
-            if (!$fileName || !file_exists($fileName)) {
+            if (! $fileName || ! file_exists($fileName)) {
                 return;
             }
 
@@ -52,25 +51,25 @@ final readonly class AstControllerExtractor implements Extractor
                 return;
             }
 
-            $parser = (new ParserFactory())->createForNewestSupportedVersion();
+            $parser = (new ParserFactory)->createForNewestSupportedVersion();
             $ast = $parser->parse($code);
 
-            if (!$ast) {
+            if (! $ast) {
                 return;
             }
 
-            $traverser = new \PhpParser\NodeTraverser();
-            $traverser->addVisitor(new \PhpParser\NodeVisitor\NameResolver());
+            $traverser = new NodeTraverser;
+            $traverser->addVisitor(new NameResolver);
             $ast = $traverser->traverse($ast);
 
             // Find the class method node
-            $nodeFinder = new NodeFinder();
+            $nodeFinder = new NodeFinder;
             /** @var Node\Stmt\ClassMethod|null $methodNode */
             $methodNode = $nodeFinder->findFirst($ast, function (Node $node) use ($method) {
                 return $node instanceof Node\Stmt\ClassMethod && $node->name->toString() === $method;
             });
 
-            if (!$methodNode instanceof Node\Stmt\ClassMethod) {
+            if (! $methodNode instanceof Node\Stmt\ClassMethod) {
                 return;
             }
 
@@ -83,15 +82,10 @@ final readonly class AstControllerExtractor implements Extractor
         }
     }
 
-    /**
-     * @param Node\Stmt\ClassMethod $methodNode
-     * @param Endpoint $endpoint
-     * @return void
-     */
     private function extractInlineValidation(Node\Stmt\ClassMethod $methodNode, Endpoint $endpoint): void
     {
-        $nodeFinder = new NodeFinder();
-        
+        $nodeFinder = new NodeFinder;
+
         /** @var Node\Expr\MethodCall[] $methodCalls */
         $methodCalls = $nodeFinder->findInstanceOf($methodNode, Node\Expr\MethodCall::class);
 
@@ -107,19 +101,14 @@ final readonly class AstControllerExtractor implements Extractor
         }
     }
 
-    /**
-     * @param Node\Expr\Array_ $arrayNode
-     * @param Endpoint $endpoint
-     * @return void
-     */
     private function parseValidationArray(Node\Expr\Array_ $arrayNode, Endpoint $endpoint): void
     {
-        if (!is_array($arrayNode->items)) {
+        if (! is_array($arrayNode->items)) {
             return;
         }
 
         foreach ($arrayNode->items as $item) {
-            if (!$item instanceof Node\Expr\ArrayItem || !$item->key instanceof Node\Scalar\String_) {
+            if (! $item instanceof Node\Expr\ArrayItem || ! $item->key instanceof Node\Scalar\String_) {
                 continue;
             }
 
@@ -141,10 +130,10 @@ final readonly class AstControllerExtractor implements Extractor
                 if (str_starts_with($r, 'enum:')) {
                     $enumClass = substr($r, 5);
                     if (function_exists('enum_exists') && enum_exists($enumClass)) {
-                        $enumValues = array_map(fn($case) => $case->value ?? $case->name, $enumClass::cases());
-                        $rules[$idx] = 'enum:' . implode(',', $enumValues);
-                        
-                        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($enumClass), [
+                        $enumValues = array_map(fn ($case) => $case->value ?? $case->name, $enumClass::cases());
+                        $rules[$idx] = 'enum:'.implode(',', $enumValues);
+
+                        SchemaRegistry::register(class_basename($enumClass), [
                             'type' => 'string',
                             'enum' => $enumValues,
                         ]);
@@ -154,7 +143,7 @@ final readonly class AstControllerExtractor implements Extractor
                 }
             }
 
-            if (!empty($rules)) {
+            if (! empty($rules)) {
                 $exists = false;
                 foreach ($endpoint->parameters as $p) {
                     if ($p->name === $paramName) {
@@ -163,13 +152,13 @@ final readonly class AstControllerExtractor implements Extractor
                     }
                 }
 
-                if (!$exists) {
+                if (! $exists) {
                     $isRequired = in_array('required', $rules, true);
                     $endpoint->addParameter(new Parameter(
                         name: $paramName,
                         type: $this->mapRuleToType($rules),
                         required: $isRequired,
-                        description: 'Validation rules: ' . implode('|', $rules),
+                        description: 'Validation rules: '.implode('|', $rules),
                         in: in_array('GET', $endpoint->methods, true) ? 'query' : 'body',
                         rules: $rules,
                         enumValues: $enumValues
@@ -180,8 +169,7 @@ final readonly class AstControllerExtractor implements Extractor
     }
 
     /**
-     * @param array<int, string> $rules
-     * @return string
+     * @param  array<int, string>  $rules
      */
     private function mapRuleToType(array $rules): string
     {
@@ -197,18 +185,14 @@ final readonly class AstControllerExtractor implements Extractor
         if (in_array('file', $rules, true) || in_array('image', $rules, true)) {
             return 'file';
         }
+
         return 'string';
     }
 
-    /**
-     * @param Node\Stmt\ClassMethod $methodNode
-     * @param Endpoint $endpoint
-     * @return void
-     */
     private function extractAbortCalls(Node\Stmt\ClassMethod $methodNode, Endpoint $endpoint): void
     {
-        $nodeFinder = new NodeFinder();
-        
+        $nodeFinder = new NodeFinder;
+
         /** @var Node\Expr\FuncCall[] $funcCalls */
         $funcCalls = $nodeFinder->findInstanceOf($methodNode, Node\Expr\FuncCall::class);
 
@@ -218,7 +202,7 @@ final readonly class AstControllerExtractor implements Extractor
                     $codeNode = $call->getArgs()[0]->value;
                     if ($codeNode instanceof Node\Scalar\Int_) {
                         $status = $codeNode->value;
-                        
+
                         $description = match ($status) {
                             401 => 'Unauthorized',
                             403 => 'Forbidden',
@@ -244,14 +228,9 @@ final readonly class AstControllerExtractor implements Extractor
         }
     }
 
-    /**
-     * @param Node\Stmt\ClassMethod $methodNode
-     * @param Endpoint $endpoint
-     * @return void
-     */
     private function extractJsonResources(Node\Stmt\ClassMethod $methodNode, Endpoint $endpoint): void
     {
-        $nodeFinder = new NodeFinder();
+        $nodeFinder = new NodeFinder;
 
         /** @var Node\Expr\StaticCall[] $staticCalls */
         $staticCalls = $nodeFinder->findInstanceOf($methodNode, Node\Expr\StaticCall::class);
@@ -261,30 +240,30 @@ final readonly class AstControllerExtractor implements Extractor
                 $methodName = $call->name->toString();
                 if (in_array($methodName, ['make', 'collection'], true)) {
                     $className = $call->class->toString();
-                    
+
                     if ($className === 'self' || $className === 'static') {
                         continue;
                     }
 
                     // To avoid dependency loops, we can use the same extraction logic from JsonResourceExtractor
-                    $extractor = new JsonResourceExtractor();
-                    
-                    if (!str_contains($className, '\\')) {
+                    $extractor = new JsonResourceExtractor;
+
+                    if (! str_contains($className, '\\')) {
                         // Let's assume it was successfully resolved by the NameResolver if it had a use statement.
                         // If it's a built-in class or an unresolved relative class in a global namespace, fallback.
-                        $className = "App\\Http\\Resources\\" . $className;
+                        $className = 'App\\Http\\Resources\\'.$className;
                     }
-                    
-                    if (!class_exists($className)) {
+
+                    if (! class_exists($className)) {
                         // Check if we can find it in another way or just skip
                         continue;
                     }
-                    
-                    if (is_subclass_of($className, \Illuminate\Http\Resources\Json\JsonResource::class)) {
+
+                    if (is_subclass_of($className, JsonResource::class)) {
                         $reflection = new ReflectionMethod($extractor, 'extractSchema');
                         $reflection->setAccessible(true);
                         $schema = $reflection->invoke($extractor, $className);
-                        
+
                         if ($methodName === 'collection') {
                             $schema = [
                                 'type' => 'object',
@@ -292,11 +271,11 @@ final readonly class AstControllerExtractor implements Extractor
                                     'data' => [
                                         'type' => 'array',
                                         'items' => $schema,
-                                    ]
-                                ]
+                                    ],
+                                ],
                             ];
                         }
-                        
+
                         $endpoint->addResponse(new Response(
                             status: 200,
                             description: "Successful response returning {$className}",
@@ -306,28 +285,28 @@ final readonly class AstControllerExtractor implements Extractor
                 }
             }
         }
-        
+
         // Also check for 'new Resource()'
         /** @var Node\Expr\New_[] $newCalls */
         $newCalls = $nodeFinder->findInstanceOf($methodNode, Node\Expr\New_::class);
         foreach ($newCalls as $call) {
             if ($call->class instanceof Node\Name) {
                 $className = $call->class->toString();
-                
-                if (!str_contains($className, '\\')) {
-                    $className = "App\\Http\\Resources\\" . $className;
+
+                if (! str_contains($className, '\\')) {
+                    $className = 'App\\Http\\Resources\\'.$className;
                 }
-                
-                if (!class_exists($className)) {
+
+                if (! class_exists($className)) {
                     continue;
                 }
-                
-                if (is_subclass_of($className, \Illuminate\Http\Resources\Json\JsonResource::class)) {
-                    $extractor = new JsonResourceExtractor();
+
+                if (is_subclass_of($className, JsonResource::class)) {
+                    $extractor = new JsonResourceExtractor;
                     $reflection = new ReflectionMethod($extractor, 'extractSchema');
                     $reflection->setAccessible(true);
                     $schema = $reflection->invoke($extractor, $className);
-                    
+
                     $endpoint->addResponse(new Response(
                         status: 200,
                         description: "Successful response returning {$className}",

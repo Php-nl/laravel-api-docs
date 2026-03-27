@@ -18,7 +18,7 @@ final readonly class AttributeExtractor implements Extractor
     {
         $action = $route->getAction();
 
-        if (!isset($action['controller']) || !is_string($action['controller'])) {
+        if (! isset($action['controller']) || ! is_string($action['controller'])) {
             return;
         }
 
@@ -29,7 +29,7 @@ final readonly class AttributeExtractor implements Extractor
             $method = '__invoke';
         }
 
-        if (!method_exists($controller, $method)) {
+        if (! method_exists($controller, $method)) {
             return;
         }
 

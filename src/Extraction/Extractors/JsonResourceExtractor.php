@@ -4,27 +4,26 @@ declare(strict_types=1);
 
 namespace PhpNl\LaravelApiDoc\Extraction\Extractors;
 
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Route;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
 use PhpNl\LaravelApiDoc\Data\Response;
+use PhpNl\LaravelApiDoc\Extraction\SchemaRegistry;
+use PhpNl\LaravelApiDoc\Extraction\Support\AstJsonResourceParser;
 use PhpNl\LaravelApiDoc\Extraction\Support\DummyResourceModel;
+use PhpNl\LaravelApiDoc\Extraction\Support\EloquentSchemaReader;
 use ReflectionMethod;
 use ReflectionNamedType;
 use Throwable;
 
 final readonly class JsonResourceExtractor implements Extractor
 {
-    /**
-     * @param Route $route
-     * @param Endpoint $endpoint
-     * @return void
-     */
     public function extract(Route $route, Endpoint $endpoint): void
     {
         $action = $route->getAction();
 
-        if (!isset($action['controller']) || !is_string($action['controller'])) {
+        if (! isset($action['controller']) || ! is_string($action['controller'])) {
             return;
         }
 
@@ -35,7 +34,7 @@ final readonly class JsonResourceExtractor implements Extractor
             $method = '__invoke';
         }
 
-        if (!method_exists($controller, $method)) {
+        if (! method_exists($controller, $method)) {
             return;
         }
 
@@ -49,34 +48,34 @@ final readonly class JsonResourceExtractor implements Extractor
 
         $docBlock = $reflection->getDocComment() ?: '';
 
-        if (!$className || (!is_subclass_of($className, JsonResource::class) && $className !== \Illuminate\Http\Resources\Json\AnonymousResourceCollection::class)) {
+        if (! $className || (! is_subclass_of($className, JsonResource::class) && $className !== AnonymousResourceCollection::class)) {
             if (preg_match('/(?:@return|@response)\s+([A-Za-z0-9_\\\\]+)(?:<([A-Za-z0-9_\\\\]+)>)?/', $docBlock, $matches)) {
                 $potentialClass = ltrim($matches[1], '\\');
-                if (!str_contains($potentialClass, '\\') && !class_exists($potentialClass)) {
+                if (! str_contains($potentialClass, '\\') && ! class_exists($potentialClass)) {
                     // Try to guess namespace if not absolute
-                    $potentialClass = "App\\Http\\Resources\\" . $potentialClass;
+                    $potentialClass = 'App\\Http\\Resources\\'.$potentialClass;
                 }
-                
-                if (class_exists($potentialClass) && (is_subclass_of($potentialClass, JsonResource::class) || $potentialClass === \Illuminate\Http\Resources\Json\AnonymousResourceCollection::class)) {
+
+                if (class_exists($potentialClass) && (is_subclass_of($potentialClass, JsonResource::class) || $potentialClass === AnonymousResourceCollection::class)) {
                     $className = $potentialClass;
                 }
             }
         }
 
-        if (!$className) {
+        if (! $className) {
             return;
         }
 
-        if (is_subclass_of($className, JsonResource::class) || $className === \Illuminate\Http\Resources\Json\AnonymousResourceCollection::class) {
-            
+        if (is_subclass_of($className, JsonResource::class) || $className === AnonymousResourceCollection::class) {
+
             $innerResourceClass = null;
             $docBlock = $reflection->getDocComment() ?: '';
 
-            if ($className === \Illuminate\Http\Resources\Json\AnonymousResourceCollection::class) {
+            if ($className === AnonymousResourceCollection::class) {
                 if (preg_match('/@return\s+.*AnonymousResourceCollection<([A-Za-z0-9_\\\\]+)>/', $docBlock, $matches)) {
                     $innerResourceClass = ltrim($matches[1], '\\');
-                    if (!str_contains($innerResourceClass, '\\')) {
-                        $innerResourceClass = "App\\Http\\Resources\\" . $innerResourceClass;
+                    if (! str_contains($innerResourceClass, '\\')) {
+                        $innerResourceClass = 'App\\Http\\Resources\\'.$innerResourceClass;
                     }
                 }
             }
@@ -91,7 +90,8 @@ final readonly class JsonResourceExtractor implements Extractor
                     $wrapProp = $reflectionClass->getProperty('wrap');
                     $wrapProp->setAccessible(true);
                     $wrapKey = $wrapProp->isStatic() ? $wrapProp->getValue(null) : $wrapProp->getDefaultValue();
-                } catch (\Throwable) {}
+                } catch (Throwable) {
+                }
             }
 
             if ($innerResourceClass) {
@@ -113,8 +113,8 @@ final readonly class JsonResourceExtractor implements Extractor
                             $wrapKey => [
                                 'type' => 'array',
                                 'items' => $schema,
-                            ]
-                        ]
+                            ],
+                        ],
                     ];
                 } else {
                     $collectionSchema = [
@@ -131,9 +131,9 @@ final readonly class JsonResourceExtractor implements Extractor
                             'last' => ['type' => 'string', 'example' => url('/api/resource?page=1')],
                             'prev' => ['type' => 'string', 'example' => null],
                             'next' => ['type' => 'string', 'example' => null],
-                        ]
+                        ],
                     ];
-                    
+
                     $collectionSchema['properties']['meta'] = [
                         'type' => 'object',
                         'properties' => [
@@ -144,7 +144,7 @@ final readonly class JsonResourceExtractor implements Extractor
                             'per_page' => ['type' => 'number', 'example' => 15],
                             'to' => ['type' => 'number', 'example' => 15],
                             'total' => ['type' => 'number', 'example' => 15],
-                        ]
+                        ],
                     ];
                 }
 
@@ -155,8 +155,8 @@ final readonly class JsonResourceExtractor implements Extractor
                     $schema = [
                         'type' => 'object',
                         'properties' => [
-                            $wrapKey => $schema
-                        ]
+                            $wrapKey => $schema,
+                        ],
                     ];
                 }
             }
@@ -170,17 +170,16 @@ final readonly class JsonResourceExtractor implements Extractor
     }
 
     /**
-     * @param string $className
      * @return array<string, mixed>
      */
     private function extractSchema(string $className): array
     {
         $modelClass = $this->inferModelClass($className);
-        
+
         $schemaObj = null;
 
         // Try AST parser first! It doesn't execute code, avoids crashes, and discovers nested dependencies natively.
-        $astParser = new \PhpNl\LaravelApiDoc\Extraction\Support\AstJsonResourceParser();
+        $astParser = new AstJsonResourceParser;
         $astProperties = $astParser->parse($className);
 
         if ($astProperties !== null) {
@@ -192,10 +191,10 @@ final readonly class JsonResourceExtractor implements Extractor
         } else {
             // Fallback to EloquentSchemaReader
             if ($modelClass) {
-                $reader = new \PhpNl\LaravelApiDoc\Extraction\Support\EloquentSchemaReader();
+                $reader = new EloquentSchemaReader;
                 $properties = $reader->read($modelClass);
-                
-                if (!empty($properties)) {
+
+                if (! empty($properties)) {
                     $schemaObj = [
                         'type' => 'object',
                         'resource' => $className,
@@ -205,10 +204,10 @@ final readonly class JsonResourceExtractor implements Extractor
             }
         }
 
-        if (!$schemaObj) {
+        if (! $schemaObj) {
             try {
                 /** @var JsonResource $resource */
-                $resource = new $className(new DummyResourceModel());
+                $resource = new $className(new DummyResourceModel);
                 $payload = $resource->toArray(request());
 
                 $schemaObj = [
@@ -224,14 +223,16 @@ final readonly class JsonResourceExtractor implements Extractor
             }
         }
 
-        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($className), $schemaObj);
+        SchemaRegistry::register(class_basename($className), $schemaObj);
 
         return $schemaObj;
     }
 
     private function inferModelClass(string $resourceClass): ?string
     {
-        if (!class_exists($resourceClass)) return null;
+        if (! class_exists($resourceClass)) {
+            return null;
+        }
 
         $reflection = new \ReflectionClass($resourceClass);
         $docBlock = $reflection->getDocComment() ?: '';
@@ -254,12 +255,12 @@ final readonly class JsonResourceExtractor implements Extractor
         $modelName = str_replace('Resource', '', $baseName);
 
         $possibleNamespaces = [
-            "\\App\\Models\\",
-            "\\App\\",
+            '\\App\\Models\\',
+            '\\App\\',
         ];
 
         foreach ($possibleNamespaces as $namespace) {
-            $class = $namespace . $modelName;
+            $class = $namespace.$modelName;
             if (class_exists($class)) {
                 return $class;
             }
@@ -269,7 +270,7 @@ final readonly class JsonResourceExtractor implements Extractor
     }
 
     /**
-     * @param array<int|string, mixed> $payload
+     * @param  array<int|string, mixed>  $payload
      * @return array<string, mixed>
      */
     private function mapArrayToSchema(array $payload): array
@@ -289,6 +290,7 @@ final readonly class JsonResourceExtractor implements Extractor
                     'resource' => $resourceClass,
                     'properties' => $this->mapArrayToSchema($value->toArray(request())),
                 ];
+
                 continue;
             }
 
@@ -308,6 +310,7 @@ final readonly class JsonResourceExtractor implements Extractor
                                 'properties' => $this->mapArrayToSchema($value[0]->toArray(request())),
                             ],
                         ];
+
                         continue;
                     }
 
@@ -324,6 +327,7 @@ final readonly class JsonResourceExtractor implements Extractor
                         'properties' => $this->mapArrayToSchema($value),
                     ];
                 }
+
                 continue;
             }
 

@@ -3,6 +3,22 @@
     "description": "Highly configurable Laravel API documentation generator",
     "type": "library",
     "license": "MIT",
+    "keywords": [
+        "laravel",
+        "api",
+        "documentation",
+        "generate",
+        "openapi",
+        "php-nl",
+        "docs"
+    ],
+    "authors": [
+        {
+            "name": "Jorrit van Vrouwerff",
+            "email": "info@serff.nl",
+            "role": "Developer"
+        }
+    ],
     "require": {
         "php": "^8.3.0",
         "illuminate/contracts": "^11.0|^12.0|^13.0",

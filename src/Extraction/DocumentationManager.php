@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace PhpNl\LaravelApiDoc\Extraction;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
 use PhpNl\LaravelApiDoc\Data\Parameter;
 use PhpNl\LaravelApiDoc\Data\Response;
+use PhpNl\LaravelApiDoc\Extraction\Webhooks\WebhookExtractor;
 
 final readonly class DocumentationManager
 {
     public function __construct(
         private Generator $generator,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -41,7 +42,7 @@ final readonly class DocumentationManager
      */
     private function fresh(): array
     {
-        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::clear();
+        SchemaRegistry::clear();
 
         $endpoints = array_map(
             fn (Endpoint $endpoint) => $this->endpointToArray($endpoint),
@@ -49,8 +50,8 @@ final readonly class DocumentationManager
         );
 
         $webhooksConfig = config('laravel-api-doc.webhooks', []);
-        if (!empty($webhooksConfig)) {
-            $webhookExtractor = new \PhpNl\LaravelApiDoc\Extraction\Webhooks\WebhookExtractor();
+        if (! empty($webhooksConfig)) {
+            $webhookExtractor = new WebhookExtractor;
             $webhooks = array_map(
                 fn (Endpoint $endpoint) => $this->endpointToArray($endpoint),
                 $webhookExtractor->extract($webhooksConfig)
@@ -60,19 +61,18 @@ final readonly class DocumentationManager
 
         return [
             'endpoints' => $endpoints,
-            'schemas' => \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::all(),
+            'schemas' => SchemaRegistry::all(),
         ];
     }
 
     /**
-     * @param Endpoint $endpoint
      * @return array<string, mixed>
      */
     private function endpointToArray(Endpoint $endpoint): array
     {
         $methodPrefix = strtolower(implode('-', $endpoint->methods));
-        $uriSlug = \Illuminate\Support\Str::slug(str_replace('/', '-', $endpoint->uri));
-        $id = trim($methodPrefix . '-' . $uriSlug, '-');
+        $uriSlug = Str::slug(str_replace('/', '-', $endpoint->uri));
+        $id = trim($methodPrefix.'-'.$uriSlug, '-');
 
         return [
             'id' => $id,

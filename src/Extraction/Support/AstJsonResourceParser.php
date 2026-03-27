@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace PhpNl\LaravelApiDoc\Extraction\Support;
 
+use Illuminate\Http\Resources\Json\JsonResource;
+use PhpNl\LaravelApiDoc\Extraction\Extractors\JsonResourceExtractor;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\ArrayItem;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Return_;
-use PhpParser\ParserFactory;
-use PhpParser\NodeTraverser;
 use PhpParser\NodeFinder;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
+use PhpParser\ParserFactory;
 use ReflectionClass;
 use Throwable;
 
@@ -21,39 +24,38 @@ final class AstJsonResourceParser
     /**
      * Parse the toArray method of a JsonResource to extract its schema properties.
      *
-     * @param string $className
      * @return array<string, mixed>|null Returns the properties array, or null if parsing fails/is empty.
      */
     public function parse(string $className): ?array
     {
-        if (!class_exists($className)) {
+        if (! class_exists($className)) {
             return null;
         }
 
         try {
             $reflection = new ReflectionClass($className);
-            if (!$reflection->hasMethod('toArray')) {
+            if (! $reflection->hasMethod('toArray')) {
                 return null;
             }
 
             $method = $reflection->getMethod('toArray');
             $fileName = $method->getFileName();
 
-            if (!$fileName || !file_exists($fileName)) {
+            if (! $fileName || ! file_exists($fileName)) {
                 return null;
             }
 
             $source = file_get_contents($fileName);
 
-            $parser = (new ParserFactory())->createForNewestSupportedVersion();
+            $parser = (new ParserFactory)->createForNewestSupportedVersion();
             $ast = $parser->parse($source);
 
-            $nameResolver = new \PhpParser\NodeVisitor\NameResolver();
-            $traverser = new NodeTraverser();
+            $nameResolver = new NameResolver;
+            $traverser = new NodeTraverser;
             $traverser->addVisitor($nameResolver);
             $ast = $traverser->traverse($ast);
 
-            $nodeFinder = new NodeFinder();
+            $nodeFinder = new NodeFinder;
 
             // Find the toArray method
             /** @var ClassMethod|null $toArrayMethod */
@@ -61,7 +63,7 @@ final class AstJsonResourceParser
                 return $node instanceof ClassMethod && $node->name->toString() === 'toArray';
             });
 
-            if (!$toArrayMethod) {
+            if (! $toArrayMethod) {
                 return null;
             }
 
@@ -82,14 +84,14 @@ final class AstJsonResourceParser
                 return $node instanceof Return_;
             });
 
-            if (!$returnStmt || !$returnStmt->expr instanceof Array_) {
+            if (! $returnStmt || ! $returnStmt->expr instanceof Array_) {
                 return null;
             }
 
             $properties = $this->parseArrayNode($returnStmt->expr, $variables);
 
             return empty($properties) ? null : $properties;
-            
+
         } catch (Throwable) {
             return null;
         }
@@ -98,8 +100,7 @@ final class AstJsonResourceParser
     /**
      * Determine property type from an ArrayItem value.
      *
-     * @param Node\Expr $valueNode
-     * @param array<string, Node\Expr> $variables
+     * @param  array<string, Node\Expr>  $variables
      * @return array<string, mixed>
      */
     private function determineTypeFromNode(Node\Expr $valueNode, array $variables): array
@@ -114,8 +115,8 @@ final class AstJsonResourceParser
             $classNode = $valueNode->class;
             if ($classNode instanceof Node\Name) {
                 $dependencyClass = $classNode->toString();
-                if (class_exists($dependencyClass) && is_subclass_of($dependencyClass, \Illuminate\Http\Resources\Json\JsonResource::class)) {
-                    $extractor = new \PhpNl\LaravelApiDoc\Extraction\Extractors\JsonResourceExtractor();
+                if (class_exists($dependencyClass) && is_subclass_of($dependencyClass, JsonResource::class)) {
+                    $extractor = new JsonResourceExtractor;
                     $reflection = new \ReflectionMethod($extractor, 'extractSchema');
                     $reflection->setAccessible(true);
                     $schema = $reflection->invoke($extractor, $dependencyClass);
@@ -145,10 +146,10 @@ final class AstJsonResourceParser
                 }
 
                 // If it's a valid class string, we trigger schema extraction for it
-                if (class_exists($dependencyClass) && is_subclass_of($dependencyClass, \Illuminate\Http\Resources\Json\JsonResource::class)) {
-                    
+                if (class_exists($dependencyClass) && is_subclass_of($dependencyClass, JsonResource::class)) {
+
                     // We extract it globally so it's registered
-                    $extractor = new \PhpNl\LaravelApiDoc\Extraction\Extractors\JsonResourceExtractor();
+                    $extractor = new JsonResourceExtractor;
                     $reflection = new \ReflectionMethod($extractor, 'extractSchema');
                     $reflection->setAccessible(true);
                     $schema = $reflection->invoke($extractor, $dependencyClass);
@@ -160,7 +161,7 @@ final class AstJsonResourceParser
                                 'type' => 'object',
                                 'resource' => $dependencyClass,
                                 'properties' => $schema['properties'] ?? null,
-                            ]
+                            ],
                         ];
                     }
 
@@ -208,9 +209,10 @@ final class AstJsonResourceParser
             if ($isList) {
                 // If it's a list, the items type is the type of the first element
                 $firstProp = reset($props);
+
                 return [
                     'type' => 'array',
-                    'items' => $firstProp ?: ['type' => 'string']
+                    'items' => $firstProp ?: ['type' => 'string'],
                 ];
             }
 
@@ -227,8 +229,7 @@ final class AstJsonResourceParser
     /**
      * Recursively parse an Array_ node into schema properties.
      *
-     * @param Array_ $arrayNode
-     * @param array<string, Node\Expr> $variables
+     * @param  array<string, Node\Expr>  $variables
      * @return array<string, mixed>
      */
     private function parseArrayNode(Array_ $arrayNode, array $variables): array
@@ -236,7 +237,7 @@ final class AstJsonResourceParser
         $properties = [];
 
         foreach ($arrayNode->items as $item) {
-            if (!$item instanceof ArrayItem) {
+            if (! $item instanceof ArrayItem) {
                 continue;
             }
 

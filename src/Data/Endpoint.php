@@ -7,13 +7,9 @@ namespace PhpNl\LaravelApiDoc\Data;
 final class Endpoint
 {
     /**
-     * @param string $uri
-     * @param array<int, string> $methods
-     * @param string|null $name
-     * @param string|null $group
-     * @param string|null $description
-     * @param array<int, Parameter> $parameters
-     * @param array<int, Response> $responses
+     * @param  array<int, string>  $methods
+     * @param  array<int, Parameter>  $parameters
+     * @param  array<int, Response>  $responses
      */
     public function __construct(
         public string $uri,
@@ -24,8 +20,7 @@ final class Endpoint
         public array $parameters = [],
         public array $responses = [],
         public bool $authRequired = false,
-    ) {
-    }
+    ) {}
 
     /**
      * Add a parameter to the endpoint.

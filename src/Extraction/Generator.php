@@ -6,6 +6,7 @@ namespace PhpNl\LaravelApiDoc\Extraction;
 
 use Illuminate\Support\Facades\Config;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
+use PhpNl\LaravelApiDoc\Extraction\Extractors\AstControllerExtractor;
 use PhpNl\LaravelApiDoc\Extraction\Extractors\AttributeExtractor;
 use PhpNl\LaravelApiDoc\Extraction\Extractors\DocblockExtractor;
 use PhpNl\LaravelApiDoc\Extraction\Extractors\Extractor;
@@ -15,13 +16,9 @@ use PhpNl\LaravelApiDoc\Extraction\Extractors\SignatureExtractor;
 
 final readonly class Generator
 {
-    /**
-     * @param RouteExplorer $explorer
-     */
     public function __construct(
         private RouteExplorer $explorer,
-    ) {
-    }
+    ) {}
 
     /**
      * Generate the documentation endpoints.
@@ -67,27 +64,27 @@ final readonly class Generator
         $extractors = [];
 
         if (Config::get('laravel-api-doc.extractors.attributes', true)) {
-            $extractors[] = new AttributeExtractor();
+            $extractors[] = new AttributeExtractor;
         }
 
         if (Config::get('laravel-api-doc.extractors.signatures', true)) {
-            $extractors[] = new SignatureExtractor();
+            $extractors[] = new SignatureExtractor;
         }
 
         if (Config::get('laravel-api-doc.extractors.docblocks', true)) {
-            $extractors[] = new DocblockExtractor();
+            $extractors[] = new DocblockExtractor;
         }
 
         if (Config::get('laravel-api-doc.extractors.form_requests', true)) {
-            $extractors[] = new FormRequestExtractor();
+            $extractors[] = new FormRequestExtractor;
         }
 
         if (Config::get('laravel-api-doc.extractors.json_resources', true)) {
-            $extractors[] = new JsonResourceExtractor();
+            $extractors[] = new JsonResourceExtractor;
         }
 
         if (Config::get('laravel-api-doc.extractors.ast_controller', true)) {
-            $extractors[] = new \PhpNl\LaravelApiDoc\Extraction\Extractors\AstControllerExtractor();
+            $extractors[] = new AstControllerExtractor;
         }
 
         return $extractors;

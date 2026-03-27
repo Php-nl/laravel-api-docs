@@ -26,6 +26,7 @@ final class SchemaRegistry
     public static function all(): array
     {
         ksort(self::$schemas);
+
         return self::$schemas;
     }
 

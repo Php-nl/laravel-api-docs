@@ -14,21 +14,21 @@ final class JsonResourceExtractorTest extends TestCase
 {
     public function test_it_extracts_response_from_json_resource(): void
     {
-        $extractor = new JsonResourceExtractor();
-        
+        $extractor = new JsonResourceExtractor;
+
         $route = RouteFacade::get('/test-resource', [ResourceController::class, 'show']);
 
         $endpoint = new Endpoint(uri: 'test-resource', methods: ['GET']);
-        
+
         $extractor->extract($route, $endpoint);
 
         $this->assertCount(1, $endpoint->responses);
         $this->assertEquals(200, $endpoint->responses[0]->status);
         $this->assertStringContainsString('TestResource', $endpoint->responses[0]->description);
-        
+
         $schema = $endpoint->responses[0]->schema;
         $this->assertEquals('object', $schema['type']);
-        
+
         $this->assertArrayHasKey('properties', $schema);
         $this->assertEquals('number', $schema['properties']['id']['type']);
         $this->assertEquals('string', $schema['properties']['name']['type']);
@@ -36,16 +36,16 @@ final class JsonResourceExtractorTest extends TestCase
 
     public function test_it_extracts_nested_json_resources(): void
     {
-        $extractor = new JsonResourceExtractor();
-        
+        $extractor = new JsonResourceExtractor;
+
         $route = RouteFacade::get('/nested-resource', [NestedResourceController::class, 'show']);
 
         $endpoint = new Endpoint(uri: 'nested-resource', methods: ['GET']);
-        
+
         $extractor->extract($route, $endpoint);
 
         $schema = $endpoint->responses[0]->schema;
-        
+
         $this->assertEquals('object', $schema['type']);
         $this->assertArrayHasKey('user', $schema['properties']);
         $this->assertEquals('object', $schema['properties']['user']['type']);
@@ -54,20 +54,20 @@ final class JsonResourceExtractorTest extends TestCase
 
     public function test_it_handles_dummy_properties_safely(): void
     {
-        $extractor = new JsonResourceExtractor();
-        
+        $extractor = new JsonResourceExtractor;
+
         $route = RouteFacade::get('/dummy-resource', [DummyController::class, 'show']);
 
         $endpoint = new Endpoint(uri: 'dummy-resource', methods: ['GET']);
-        
+
         $extractor->extract($route, $endpoint);
 
         $schema = $endpoint->responses[0]->schema;
-        
+
         $this->assertEquals('object', $schema['type']);
         $this->assertArrayHasKey('id', $schema['properties']);
         $this->assertEquals('number', $schema['properties']['id']['type']);
-        
+
         $this->assertArrayHasKey('is_active', $schema['properties']);
         $this->assertEquals('boolean', $schema['properties']['is_active']['type']);
     }

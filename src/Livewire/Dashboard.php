@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace PhpNl\LaravelApiDoc\Livewire;
 
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use Livewire\Attributes\Session;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
-use PhpNl\LaravelApiDoc\Data\Parameter;
-use PhpNl\LaravelApiDoc\Data\Response;
+use PhpNl\LaravelApiDoc\Extraction\DocumentationManager;
 
 final class Dashboard extends Component
 {
     use WithFileUploads;
+
     /** @var array<int, array<string, mixed>> */
     public array $endpoints = [];
 
@@ -25,57 +31,44 @@ final class Dashboard extends Component
     /** @var array<string, mixed> */
     public array $realResponses = [];
 
-    /** @var string|null */
-    #[\Livewire\Attributes\Url(as: 'endpoint', history: true)]
+    #[Url(as: 'endpoint', history: true)]
     public ?string $selectedId = null;
 
-    /** @var string|null */
-    #[\Livewire\Attributes\Url(as: 'schema', history: true)]
+    #[Url(as: 'schema', history: true)]
     public ?string $selectedSchemaId = null;
-    
-    /** @var string|null */
-    #[\Livewire\Attributes\Url(as: 'page', history: true)]
+
+    #[Url(as: 'page', history: true)]
     public ?string $selectedPageId = null;
 
-    /** @var string|null */
-    #[\Livewire\Attributes\Url(as: 'version', history: true)]
+    #[Url(as: 'version', history: true)]
     public ?string $selectedVersion = null;
 
-    /** @var string */
     public string $search = '';
 
     /** @var array<string, mixed> */
     public array $tryItOutForm = [];
 
-    /** @var string */
-    #[\Livewire\Attributes\Session]
+    #[Session]
     public string $globalAuthMethod = 'none'; // none, bearer, basic, api_key
 
-    /** @var string */
-    #[\Livewire\Attributes\Session]
+    #[Session]
     public string $globalAuthToken = '';
 
-    /** @var string */
-    #[\Livewire\Attributes\Session]
+    #[Session]
     public string $globalAuthUsername = '';
 
-    /** @var string */
-    #[\Livewire\Attributes\Session]
+    #[Session]
     public string $globalAuthPassword = '';
 
-    /** @var string */
-    #[\Livewire\Attributes\Session]
+    #[Session]
     public string $globalApiKeyName = 'X-API-Key';
 
-    /** @var string */
-    #[\Livewire\Attributes\Session]
+    #[Session]
     public string $globalApiKeyValue = '';
 
-    /** @var string */
-    #[\Livewire\Attributes\Session]
+    #[Session]
     public string $globalApiKeyLocation = 'header'; // header, query
 
-    /** @var bool */
     public bool $useAuth = false;
 
     /** @var array<string, mixed>|null */
@@ -84,9 +77,9 @@ final class Dashboard extends Component
     /**
      * Mount the component.
      */
-    public function mount(\PhpNl\LaravelApiDoc\Extraction\DocumentationManager $manager): void
+    public function mount(DocumentationManager $manager): void
     {
-        if (config('laravel-api-doc.versions.enabled', false) && !$this->selectedVersion) {
+        if (config('laravel-api-doc.versions.enabled', false) && ! $this->selectedVersion) {
             $this->selectedVersion = config('laravel-api-doc.versions.default', 'v1');
         }
 
@@ -105,25 +98,25 @@ final class Dashboard extends Component
         $this->loadMarkdownPages();
 
         $responsesFile = storage_path('app/api-docs/responses.json');
-        if (\Illuminate\Support\Facades\File::exists($responsesFile)) {
-            $this->realResponses = json_decode(\Illuminate\Support\Facades\File::get($responsesFile), true) ?: [];
+        if (File::exists($responsesFile)) {
+            $this->realResponses = json_decode(File::get($responsesFile), true) ?: [];
         }
     }
 
     private function loadMarkdownPages(): void
     {
         $docsPath = config('laravel-api-doc.ui.docs_path', resource_path('docs/api'));
-        
+
         if (is_dir($docsPath)) {
-            foreach (\Illuminate\Support\Facades\File::files($docsPath) as $file) {
+            foreach (File::files($docsPath) as $file) {
                 if ($file->getExtension() === 'md') {
-                    $pageId = \Illuminate\Support\Str::slug($file->getFilenameWithoutExtension());
-                    $title = \Illuminate\Support\Str::title(str_replace(['-', '_'], ' ', $file->getFilenameWithoutExtension()));
-                    
+                    $pageId = Str::slug($file->getFilenameWithoutExtension());
+                    $title = Str::title(str_replace(['-', '_'], ' ', $file->getFilenameWithoutExtension()));
+
                     $this->markdownPages[$pageId] = [
                         'id' => $pageId,
                         'title' => $title,
-                        'content' => \Illuminate\Support\Str::markdown($file->getContents()),
+                        'content' => Str::markdown($file->getContents()),
                     ];
                 }
             }
@@ -131,35 +124,36 @@ final class Dashboard extends Component
     }
 
     /**
-     * @param array<int, array<string, mixed>> $endpoints
+     * @param  array<int, array<string, mixed>>  $endpoints
      * @return array<string, array<string, mixed>>
      */
     private function extractSchemas(array $endpoints): array
     {
         $schemas = [];
-        
+
         foreach ($endpoints as $endpoint) {
             foreach ($endpoint['responses'] ?? [] as $response) {
-                if (!empty($response['schema']) && isset($response['schema']['resource'])) {
+                if (! empty($response['schema']) && isset($response['schema']['resource'])) {
                     $resourceClass = $response['schema']['resource'];
                     $baseName = class_basename($resourceClass);
-                    if (!isset($schemas[$baseName])) {
+                    if (! isset($schemas[$baseName])) {
                         $schemas[$baseName] = $response['schema'];
                     }
                 }
-                
+
                 // Extract from collection arrays
-                if (!empty($response['schema']['items']) && isset($response['schema']['items']['resource'])) {
+                if (! empty($response['schema']['items']) && isset($response['schema']['items']['resource'])) {
                     $resourceClass = $response['schema']['items']['resource'];
                     $baseName = class_basename($resourceClass);
-                    if (!isset($schemas[$baseName])) {
+                    if (! isset($schemas[$baseName])) {
                         $schemas[$baseName] = $response['schema']['items'];
                     }
                 }
             }
         }
-        
+
         ksort($schemas);
+
         return $schemas;
     }
 
@@ -193,7 +187,7 @@ final class Dashboard extends Component
             'body' => [],
             'path' => [],
         ];
-        
+
         // Auto-enable authentication for this endpoint if a global method is configured
         $this->useAuth = $this->globalAuthMethod !== 'none';
 
@@ -213,7 +207,7 @@ final class Dashboard extends Component
     {
         $endpoint = $this->getSelectedEndpointProperty();
 
-        if (!$endpoint) {
+        if (! $endpoint) {
             return;
         }
 
@@ -225,12 +219,12 @@ final class Dashboard extends Component
         $bodyParams = $this->tryItOutForm['body'] ?? [];
 
         foreach ($pathParams as $key => $value) {
-            $uri = str_replace('{' . $key . '}', (string) $value, $uri);
+            $uri = str_replace('{'.$key.'}', (string) $value, $uri);
         }
 
         $files = [];
         foreach ($bodyParams as $key => $value) {
-            if ($value instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile) {
+            if ($value instanceof TemporaryUploadedFile) {
                 $files[$key] = $value;
                 unset($bodyParams[$key]);
             }
@@ -239,7 +233,7 @@ final class Dashboard extends Component
         $startTime = microtime(true);
 
         try {
-            $request = \Illuminate\Support\Facades\Http::withHeaders([
+            $request = Http::withHeaders([
                 'Accept' => 'application/json',
             ]);
 
@@ -259,11 +253,11 @@ final class Dashboard extends Component
                 }
             }
 
-            if (!empty($queryParams)) {
-                $uri .= (str_contains($uri, '?') ? '&' : '?') . http_build_query($queryParams);
+            if (! empty($queryParams)) {
+                $uri .= (str_contains($uri, '?') ? '&' : '?').http_build_query($queryParams);
             }
 
-            if (!empty($files)) {
+            if (! empty($files)) {
                 foreach ($files as $name => $file) {
                     $request->attach(
                         $name,
@@ -340,9 +334,10 @@ final class Dashboard extends Component
      */
     public function getSelectedSchemaProperty(): ?array
     {
-        if (!$this->selectedSchemaId) {
+        if (! $this->selectedSchemaId) {
             return null;
         }
+
         return $this->schemas[$this->selectedSchemaId] ?? null;
     }
 
@@ -351,9 +346,10 @@ final class Dashboard extends Component
      */
     public function getSelectedPageProperty(): ?array
     {
-        if (!$this->selectedPageId) {
+        if (! $this->selectedPageId) {
             return null;
         }
+
         return $this->markdownPages[$this->selectedPageId] ?? null;
     }
 
@@ -369,10 +365,12 @@ final class Dashboard extends Component
         return collect($this->endpoints)
             ->filter(fn (array $e) => str_contains(strtolower($e['uri']), strtolower($this->search)))
             ->filter(function (array $e) use ($versionEnabled) {
-                if (!$versionEnabled || !$this->selectedVersion) return true;
-                
-                return str_contains($e['uri'], '/' . $this->selectedVersion . '/') || 
-                       str_starts_with($e['uri'], $this->selectedVersion . '/');
+                if (! $versionEnabled || ! $this->selectedVersion) {
+                    return true;
+                }
+
+                return str_contains($e['uri'], '/'.$this->selectedVersion.'/') ||
+                       str_starts_with($e['uri'], $this->selectedVersion.'/');
             })
             ->groupBy(fn (array $e) => $e['group'] ?? 'Default')
             ->toArray();
