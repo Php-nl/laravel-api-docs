@@ -90,8 +90,18 @@ final class Dashboard extends Component
             $this->selectedVersion = config('laravel-api-doc.versions.default', 'v1');
         }
 
-        $this->endpoints = $manager->get();
-        $this->schemas = $this->extractSchemas($this->endpoints);
+        $data = $manager->get();
+        // Fallback for older cached versions
+        if (isset($data[0]) && is_array($data[0])) {
+            $this->endpoints = $data;
+            $globalSchemas = [];
+        } else {
+            $this->endpoints = $data['endpoints'] ?? [];
+            $globalSchemas = $data['schemas'] ?? [];
+        }
+
+        $this->schemas = array_merge($globalSchemas, $this->extractSchemas($this->endpoints));
+        ksort($this->schemas);
         $this->loadMarkdownPages();
 
         $responsesFile = storage_path('app/api-docs/responses.json');

@@ -81,7 +81,18 @@ final readonly class JsonResourceExtractor implements Extractor
                 }
             }
 
-            $schema = $this->extractSchema($innerResourceClass ?: $className);
+            $resourceClassToUse = $innerResourceClass ?: $className;
+            $schema = $this->extractSchema($resourceClassToUse);
+
+            $wrapKey = 'data';
+            if (property_exists($resourceClassToUse, 'wrap')) {
+                try {
+                    $reflectionClass = new \ReflectionClass($resourceClassToUse);
+                    $wrapProp = $reflectionClass->getProperty('wrap');
+                    $wrapProp->setAccessible(true);
+                    $wrapKey = $wrapProp->isStatic() ? $wrapProp->getValue(null) : $wrapProp->getDefaultValue();
+                } catch (\Throwable) {}
+            }
 
             if ($innerResourceClass) {
                 $isPaginated = false;
@@ -95,17 +106,24 @@ final readonly class JsonResourceExtractor implements Extractor
                     }
                 }
 
-                $collectionSchema = [
-                    'type' => 'object',
-                    'properties' => [
-                        'data' => [
-                            'type' => 'array',
-                            'items' => $schema,
+                if ($wrapKey !== null) {
+                    $collectionSchema = [
+                        'type' => 'object',
+                        'properties' => [
+                            $wrapKey => [
+                                'type' => 'array',
+                                'items' => $schema,
+                            ]
                         ]
-                    ]
-                ];
+                    ];
+                } else {
+                    $collectionSchema = [
+                        'type' => 'array',
+                        'items' => $schema,
+                    ];
+                }
 
-                if ($isPaginated) {
+                if ($isPaginated && $wrapKey !== null) {
                     $collectionSchema['properties']['links'] = [
                         'type' => 'object',
                         'properties' => [
@@ -131,6 +149,16 @@ final readonly class JsonResourceExtractor implements Extractor
                 }
 
                 $schema = $collectionSchema;
+            } else {
+                // Single resource
+                if ($wrapKey !== null) {
+                    $schema = [
+                        'type' => 'object',
+                        'properties' => [
+                            $wrapKey => $schema
+                        ]
+                    ];
+                }
             }
 
             $endpoint->addResponse(new Response(
@@ -149,35 +177,56 @@ final readonly class JsonResourceExtractor implements Extractor
     {
         $modelClass = $this->inferModelClass($className);
         
-        if ($modelClass) {
-            $reader = new \PhpNl\LaravelApiDoc\Extraction\Support\EloquentSchemaReader();
-            $properties = $reader->read($modelClass);
-            
-            if (!empty($properties)) {
-                return [
+        $schemaObj = null;
+
+        // Try AST parser first! It doesn't execute code, avoids crashes, and discovers nested dependencies natively.
+        $astParser = new \PhpNl\LaravelApiDoc\Extraction\Support\AstJsonResourceParser();
+        $astProperties = $astParser->parse($className);
+
+        if ($astProperties !== null) {
+            $schemaObj = [
+                'type' => 'object',
+                'resource' => $className,
+                'properties' => $astProperties,
+            ];
+        } else {
+            // Fallback to EloquentSchemaReader
+            if ($modelClass) {
+                $reader = new \PhpNl\LaravelApiDoc\Extraction\Support\EloquentSchemaReader();
+                $properties = $reader->read($modelClass);
+                
+                if (!empty($properties)) {
+                    $schemaObj = [
+                        'type' => 'object',
+                        'resource' => $className,
+                        'properties' => $properties,
+                    ];
+                }
+            }
+        }
+
+        if (!$schemaObj) {
+            try {
+                /** @var JsonResource $resource */
+                $resource = new $className(new DummyResourceModel());
+                $payload = $resource->toArray(request());
+
+                $schemaObj = [
                     'type' => 'object',
                     'resource' => $className,
-                    'properties' => $properties,
+                    'properties' => $this->mapArrayToSchema($payload),
+                ];
+            } catch (Throwable) {
+                $schemaObj = [
+                    'type' => 'object',
+                    'resource' => $className,
                 ];
             }
         }
 
-        try {
-            /** @var JsonResource $resource */
-            $resource = new $className(new DummyResourceModel());
-            $payload = $resource->toArray(request());
+        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($className), $schemaObj);
 
-            return [
-                'type' => 'object',
-                'resource' => $className,
-                'properties' => $this->mapArrayToSchema($payload),
-            ];
-        } catch (Throwable) {
-            return [
-                'type' => 'object',
-                'resource' => $className,
-            ];
-        }
+        return $schemaObj;
     }
 
     private function inferModelClass(string $resourceClass): ?string
@@ -231,8 +280,13 @@ final readonly class JsonResourceExtractor implements Extractor
             $type = gettype($value);
 
             if ($value instanceof JsonResource) {
+                // To get nested resources, we extract the schema which registers it.
+                $resourceClass = get_class($value);
+                $this->extractSchema($resourceClass);
+
                 $schema[$key] = [
                     'type' => 'object',
+                    'resource' => $resourceClass,
                     'properties' => $this->mapArrayToSchema($value->toArray(request())),
                 ];
                 continue;
@@ -243,10 +297,14 @@ final readonly class JsonResourceExtractor implements Extractor
                     $itemType = count($value) > 0 ? gettype($value[0]) : 'mixed';
 
                     if ($itemType === 'object' && $value[0] instanceof JsonResource) {
+                        $resourceClass = get_class($value[0]);
+                        $this->extractSchema($resourceClass);
+
                         $schema[$key] = [
                             'type' => 'array',
                             'items' => [
                                 'type' => 'object',
+                                'resource' => $resourceClass,
                                 'properties' => $this->mapArrayToSchema($value[0]->toArray(request())),
                             ],
                         ];

@@ -32,6 +32,23 @@
                                 @if(isset($property['example']))
                                     <span class="text-[11px] text-slate-400 truncate ml-3">Example: <span class="text-emerald-400/80">{{ is_array($property['example']) ? json_encode($property['example']) : $property['example'] }}</span></span>
                                 @endif
+
+                                @if(isset($property['rules']) && is_array($property['rules']))
+                                    <div class="flex items-center space-x-1.5 ml-3">
+                                        @foreach($property['rules'] as $rule)
+                                            <span class="px-1.5 py-0.5 rounded-sm bg-slate-800 border border-slate-700/50 text-[10px] text-slate-300">{{ $rule }}</span>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                @if(isset($property['enum']) && is_array($property['enum']))
+                                    <div class="flex items-center space-x-1.5 ml-3">
+                                        <span class="text-[10px] text-slate-400 uppercase font-semibold">Enum:</span>
+                                        @foreach($property['enum'] as $enumVal)
+                                            <span class="px-1.5 py-0.5 rounded-sm bg-indigo-900/30 border border-indigo-800/50 text-[10px] text-indigo-300">{{ $enumVal }}</span>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
 
                             @if(isset($property['properties']) || isset($property['items']))

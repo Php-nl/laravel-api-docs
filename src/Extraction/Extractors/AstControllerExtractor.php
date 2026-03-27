@@ -143,6 +143,11 @@ final readonly class AstControllerExtractor implements Extractor
                     if (function_exists('enum_exists') && enum_exists($enumClass)) {
                         $enumValues = array_map(fn($case) => $case->value ?? $case->name, $enumClass::cases());
                         $rules[$idx] = 'enum:' . implode(',', $enumValues);
+                        
+                        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($enumClass), [
+                            'type' => 'string',
+                            'enum' => $enumValues,
+                        ]);
                     }
                 } elseif (str_starts_with($r, 'in:')) {
                     $enumValues = explode(',', substr($r, 3));

@@ -81,19 +81,26 @@ final readonly class DocblockExtractor implements Extractor
 
             // Check if parameter already exists (from SignatureExtractor)
             $exists = false;
-            foreach ($endpoint->parameters as $parameter) {
+            foreach ($endpoint->parameters as $index => $parameter) {
                 if ($parameter->name === $name) {
                     $exists = true;
                     // Update description if it was missing
-                    if ($parameter->description === null) {
-                        // This is a bit tricky since Endpoint properties are public and Parameter is readonly.
-                        // For now, we'll just skip or we might need to recreate the parameter.
+                    if ($parameter->description === null && $description) {
+                        $endpoint->parameters[$index] = new Parameter(
+                            name: $parameter->name,
+                            type: $parameter->type,
+                            required: $parameter->required,
+                            description: $description,
+                            in: $parameter->in,
+                            rules: $parameter->rules,
+                            enumValues: $parameter->enumValues
+                        );
                     }
                     break;
                 }
             }
 
-            if (!$exists) {
+            if (!$exists && $description) {
                 $endpoint->addParameter(new Parameter(
                     name: $name,
                     type: $type,

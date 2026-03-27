@@ -74,6 +74,8 @@ final readonly class FormRequestExtractor implements Extractor
             $in = 'body';
         }
 
+        $addedParameters = [];
+
         foreach ($rules as $name => $rule) {
             $ruleArray = [];
             $enumValues = null;
@@ -89,6 +91,11 @@ final readonly class FormRequestExtractor implements Extractor
                             if (function_exists('enum_exists') && enum_exists($enumClass)) {
                                 $enumValues = array_map(fn($case) => $case->value ?? $case->name, $enumClass::cases());
                                 $ruleArray[] = 'enum:' . implode(',', $enumValues);
+                                
+                                \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($enumClass), [
+                                    'type' => 'string',
+                                    'enum' => $enumValues,
+                                ]);
                                 continue;
                             }
                         } catch (\Throwable) {}
@@ -97,6 +104,11 @@ final readonly class FormRequestExtractor implements Extractor
                     if (is_string($r) && function_exists('enum_exists') && enum_exists($r)) {
                         $enumValues = array_map(fn($case) => $case->value ?? $case->name, $r::cases());
                         $ruleArray[] = 'enum:' . implode(',', $enumValues);
+                        
+                        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($r), [
+                            'type' => 'string',
+                            'enum' => $enumValues,
+                        ]);
                         continue;
                     }
 
@@ -120,6 +132,11 @@ final readonly class FormRequestExtractor implements Extractor
                         if (function_exists('enum_exists') && enum_exists($enumClass)) {
                             $enumValues = array_map(fn($case) => $case->value ?? $case->name, $enumClass::cases());
                             $ruleArray[$idx] = 'enum:' . implode(',', $enumValues);
+                            
+                            \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($enumClass), [
+                                'type' => 'string',
+                                'enum' => $enumValues,
+                            ]);
                         }
                     } elseif (str_starts_with($r, 'in:')) {
                         $enumValues = explode(',', substr($r, 3));
@@ -141,7 +158,7 @@ final readonly class FormRequestExtractor implements Extractor
             }
 
             if (!$exists) {
-                $endpoint->addParameter(new Parameter(
+                $newParameter = new Parameter(
                     name: $name,
                     type: $type,
                     required: $isRequired,
@@ -149,11 +166,24 @@ final readonly class FormRequestExtractor implements Extractor
                     in: $in,
                     rules: $ruleArray,
                     enumValues: $enumValues
-                ));
+                );
+                $endpoint->addParameter($newParameter);
+                $addedParameters[] = $newParameter;
+            } else {
+                // If it already exists, we should still include it in the schema if it's part of rules
+                foreach ($endpoint->parameters as $p) {
+                    if ($p->name === $name) {
+                        $addedParameters[] = $p;
+                        break;
+                    }
+                }
             }
         }
 
-        $this->introspectModelFromRequest($className, $endpoint, $in);
+        $this->introspectModelFromRequest($className, $endpoint, $in, $addedParameters);
+        
+        // Also register the full form request as a Schema
+        $this->registerSchema($className, $addedParameters);
     }
 
     /**
@@ -193,8 +223,9 @@ final readonly class FormRequestExtractor implements Extractor
      * @param string $requestClass
      * @param Endpoint $endpoint
      * @param string $in
+     * @param array<Parameter> &$addedParameters
      */
-    private function introspectModelFromRequest(string $requestClass, Endpoint $endpoint, string $in): void
+    private function introspectModelFromRequest(string $requestClass, Endpoint $endpoint, string $in, array &$addedParameters): void
     {
         $basename = class_basename($requestClass);
         $modelName = str_replace(['Store', 'Update', 'Request'], '', $basename);
@@ -256,7 +287,7 @@ final readonly class FormRequestExtractor implements Extractor
                     elseif (str_contains($cast, 'date') || str_contains($cast, 'datetime')) $type = 'date';
                 }
 
-                $endpoint->addParameter(new Parameter(
+                $newParameter = new Parameter(
                     name: $column,
                     type: $type,
                     required: $required,
@@ -264,10 +295,188 @@ final readonly class FormRequestExtractor implements Extractor
                     in: $in,
                     rules: $required ? ['required'] : [],
                     enumValues: null
-                ));
+                );
+                
+                $endpoint->addParameter($newParameter);
+                $addedParameters[] = $newParameter;
             }
         } catch (\Throwable) {
             // Ignore if DB is not reachable or table doesn't exist
+        }
+    }
+
+    /**
+     * @param string $requestClass
+     * @param array<Parameter> $parameters
+     */
+    private function registerSchema(string $requestClass, array $parameters): void
+    {
+        $properties = [];
+        $required = [];
+
+        foreach ($parameters as $parameter) {
+            $prop = [
+                'type' => $parameter->type,
+                'description' => $parameter->description,
+            ];
+
+            if ($parameter->enumValues) {
+                $prop['enum'] = $parameter->enumValues;
+            }
+
+            if (!empty($parameter->rules)) {
+                $prop['rules'] = $parameter->rules;
+
+                // Add OpenAPI standard constraints
+                foreach ($parameter->rules as $rule) {
+                    $rule = (string) $rule;
+                    if (str_starts_with($rule, 'min:')) {
+                        $val = (float) substr($rule, 4);
+                        if ($parameter->type === 'string') $prop['minLength'] = (int) $val;
+                        elseif ($parameter->type === 'number' || $parameter->type === 'integer') $prop['minimum'] = $val;
+                        elseif ($parameter->type === 'array') $prop['minItems'] = (int) $val;
+                    } elseif (str_starts_with($rule, 'max:')) {
+                        $val = (float) substr($rule, 4);
+                        if ($parameter->type === 'string') $prop['maxLength'] = (int) $val;
+                        elseif ($parameter->type === 'number' || $parameter->type === 'integer') $prop['maximum'] = $val;
+                        elseif ($parameter->type === 'array') $prop['maxItems'] = (int) $val;
+                    } elseif (str_starts_with($rule, 'size:')) {
+                        $val = (float) substr($rule, 5);
+                        if ($parameter->type === 'string') {
+                            $prop['minLength'] = (int) $val;
+                            $prop['maxLength'] = (int) $val;
+                        } elseif ($parameter->type === 'array') {
+                            $prop['minItems'] = (int) $val;
+                            $prop['maxItems'] = (int) $val;
+                        }
+                    } elseif ($rule === 'email') {
+                        $prop['format'] = 'email';
+                    } elseif ($rule === 'uuid') {
+                        $prop['format'] = 'uuid';
+                    } elseif (in_array($rule, ['url', 'active_url'])) {
+                        $prop['format'] = 'uri';
+                    } elseif ($rule === 'ipv4') {
+                        $prop['format'] = 'ipv4';
+                    } elseif ($rule === 'ipv6') {
+                        $prop['format'] = 'ipv6';
+                    } elseif ($parameter->type === 'date') {
+                        $prop['format'] = 'date-time'; // Default
+                        if ($rule === 'date_format:Y-m-d') {
+                            $prop['format'] = 'date';
+                        }
+                    }
+                }
+            }
+
+            // Parse dot notation
+            $this->applyDotNotation($properties, explode('.', $parameter->name), $prop);
+
+            if ($parameter->required) {
+                $required[] = $parameter->name;
+            }
+        }
+
+        // Clean up required array to only include root level required fields
+        // or we could build a nested required structure if needed, but for simplicity
+        // standard OpenAPI allows required at each object level.
+        $rootRequired = [];
+        foreach ($required as $req) {
+            $parts = explode('.', $req);
+            if (count($parts) === 1) {
+                $rootRequired[] = $req;
+            }
+        }
+
+        $schema = [
+            'type' => 'object',
+            'properties' => $properties,
+        ];
+
+        if (!empty($rootRequired)) {
+            $schema['required'] = array_unique($rootRequired);
+        }
+
+        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::register(class_basename($requestClass), $schema);
+    }
+
+    /**
+     * @param array<string, mixed> &$schema
+     * @param array<int, string> $parts
+     * @param array<string, mixed> $prop
+     */
+    private function applyDotNotation(array &$schema, array $parts, array $prop): void
+    {
+        $current = array_shift($parts);
+
+        if (count($parts) === 0) {
+            // Leaf node
+            if ($current === '*') {
+                // Should not happen at root, but if it does...
+                $schema = $prop;
+            } else {
+                // If it already exists (e.g., an array definition without items yet), merge it
+                if (isset($schema[$current]) && is_array($schema[$current])) {
+                    $schema[$current] = array_merge($schema[$current], $prop);
+                } else {
+                    $schema[$current] = $prop;
+                }
+            }
+            return;
+        }
+
+        if ($current === '*') {
+            // We are inside an array type. The schema here is the `items` object.
+            // But wait, the parent called `applyDotNotation($schema, ...)` where `$schema` is the `items` array?
+            // No, the parent called `applyDotNotation($schema['items'], ...)`.
+            // So if `$current` is '*', we just apply to the current schema directly as the items.
+            $this->applyDotNotation($schema, $parts, $prop);
+            return;
+        }
+
+        if (!isset($schema[$current])) {
+            $next = $parts[0];
+            if ($next === '*') {
+                $schema[$current] = [
+                    'type' => 'array',
+                    'items' => [],
+                ];
+            } else {
+                $schema[$current] = [
+                    'type' => 'object',
+                    'properties' => [],
+                ];
+            }
+        }
+
+        if (isset($schema[$current]['type']) && $schema[$current]['type'] === 'array') {
+            if ($parts[0] === '*') {
+                // Next is '*', skip it and go to its children inside 'items'
+                array_shift($parts);
+                if (count($parts) === 0) {
+                    $schema[$current]['items'] = $prop;
+                } else {
+                    if (!isset($schema[$current]['items']) || !is_array($schema[$current]['items'])) {
+                        $schema[$current]['items'] = [];
+                    }
+                    if (!isset($schema[$current]['items']['properties']) || !is_array($schema[$current]['items']['properties'])) {
+                        $schema[$current]['items']['properties'] = [];
+                        $schema[$current]['items']['type'] = 'object';
+                    }
+                    $this->applyDotNotation($schema[$current]['items']['properties'], $parts, $prop);
+                }
+            } else {
+                // Malformed rule, treating as object
+                if (!isset($schema[$current]['properties']) || !is_array($schema[$current]['properties'])) {
+                    $schema[$current]['properties'] = [];
+                }
+                $this->applyDotNotation($schema[$current]['properties'], $parts, $prop);
+            }
+        } else {
+            // Object type
+            if (!isset($schema[$current]['properties']) || !is_array($schema[$current]['properties'])) {
+                $schema[$current]['properties'] = [];
+            }
+            $this->applyDotNotation($schema[$current]['properties'], $parts, $prop);
         }
     }
 }

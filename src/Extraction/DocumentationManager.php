@@ -17,7 +17,7 @@ final readonly class DocumentationManager
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return array<string, mixed>
      */
     public function get(): array
     {
@@ -37,10 +37,12 @@ final readonly class DocumentationManager
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return array<string, mixed>
      */
     private function fresh(): array
     {
+        \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::clear();
+
         $endpoints = array_map(
             fn (Endpoint $endpoint) => $this->endpointToArray($endpoint),
             $this->generator->generate()
@@ -56,7 +58,10 @@ final readonly class DocumentationManager
             $endpoints = array_merge($endpoints, $webhooks);
         }
 
-        return $endpoints;
+        return [
+            'endpoints' => $endpoints,
+            'schemas' => \PhpNl\LaravelApiDoc\Extraction\SchemaRegistry::all(),
+        ];
     }
 
     /**

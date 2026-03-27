@@ -54,7 +54,7 @@
         <div class="flex-1 overflow-y-auto py-4 custom-scrollbar">
             <!-- Documentation Pages -->
             @if(count($this->markdownPages) > 0)
-                <div class="mb-6" x-data="{ expanded: true }">
+                <div class="mb-6" x-data="{ expanded: true }" x-effect="if ($wire.search) expanded = true;">
                     <button @click="expanded = !expanded" class="w-full px-5 mb-2 focus:outline-none group/toggle">
                         <h2 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center group-hover/toggle:text-slate-700 dark:group-hover/toggle:text-slate-300 transition-colors">
                             <span class="bg-slate-200 dark:bg-slate-700 h-px flex-1 mr-2 group-hover/toggle:bg-slate-300 dark:group-hover/toggle:bg-slate-600 transition-colors"></span>
@@ -82,7 +82,7 @@
             @endif
 
             @foreach($this->groups as $group => $endpoints)
-                <div class="mb-6" x-data="{ expanded: {{ collect($endpoints)->contains('id', $selectedId) || $search !== '' ? 'true' : 'false' }} }">
+                <div class="mb-6" x-data="{ expanded: {{ collect($endpoints)->contains('id', $selectedId) || $search !== '' ? 'true' : 'false' }} }" x-effect="if ($wire.search) expanded = true;">
                     <button @click="expanded = !expanded" class="w-full px-5 mb-2 focus:outline-none group/toggle">
                         <h2 class="text-xs font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider flex items-center group-hover/toggle:text-gray-600 dark:group-hover/toggle:text-slate-300 transition-colors">
                             <span class="bg-gray-200 dark:bg-slate-700 h-px flex-1 mr-2 group-hover/toggle:bg-gray-300 dark:group-hover/toggle:bg-slate-600 transition-colors"></span>
@@ -116,7 +116,7 @@
 
             <!-- Schemas Section -->
             @if(count($this->schemas) > 0)
-                <div class="mb-6 mt-8" x-data="{ expanded: {{ $selectedSchemaId || $search !== '' ? 'true' : 'false' }} }">
+                <div class="mb-6 mt-8" x-data="{ expanded: {{ $selectedSchemaId || $search !== '' ? 'true' : 'false' }} }" x-effect="if ($wire.search) expanded = true;">
                     <button @click="expanded = !expanded" class="w-full px-5 mb-2 focus:outline-none group/toggle">
                         <h2 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center group-hover/toggle:text-slate-700 dark:group-hover/toggle:text-slate-300 transition-colors">
                             <span class="bg-slate-200 dark:bg-slate-700 h-px flex-1 mr-2 group-hover/toggle:bg-slate-300 dark:group-hover/toggle:bg-slate-600 transition-colors"></span>
