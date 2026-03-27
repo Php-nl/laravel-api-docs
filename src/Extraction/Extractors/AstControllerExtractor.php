@@ -265,6 +265,17 @@ final readonly class AstControllerExtractor implements Extractor
                         $schema = $reflection->invoke($extractor, $className);
 
                         if ($methodName === 'collection') {
+                            $isPaginated = false;
+
+                            /** @var Node\Expr\MethodCall[] $methCalls */
+                            $methCalls = $nodeFinder->findInstanceOf($methodNode, Node\Expr\MethodCall::class);
+                            foreach ($methCalls as $methCall) {
+                                if ($methCall->name instanceof Node\Identifier && $methCall->name->toString() === 'paginate') {
+                                    $isPaginated = true;
+                                    break;
+                                }
+                            }
+
                             $schema = [
                                 'type' => 'object',
                                 'properties' => [
@@ -274,6 +285,31 @@ final readonly class AstControllerExtractor implements Extractor
                                     ],
                                 ],
                             ];
+
+                            if ($isPaginated) {
+                                $schema['properties']['links'] = [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'first' => ['type' => 'string', 'example' => url('/api/resource?page=1')],
+                                        'last' => ['type' => 'string', 'example' => url('/api/resource?page=1')],
+                                        'prev' => ['type' => 'string', 'example' => null],
+                                        'next' => ['type' => 'string', 'example' => null],
+                                    ],
+                                ];
+
+                                $schema['properties']['meta'] = [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'current_page' => ['type' => 'number', 'example' => 1],
+                                        'from' => ['type' => 'number', 'example' => 1],
+                                        'last_page' => ['type' => 'number', 'example' => 1],
+                                        'path' => ['type' => 'string', 'example' => url('/api/resource')],
+                                        'per_page' => ['type' => 'number', 'example' => 15],
+                                        'to' => ['type' => 'number', 'example' => 15],
+                                        'total' => ['type' => 'number', 'example' => 15],
+                                    ],
+                                ];
+                            }
                         }
 
                         $endpoint->addResponse(new Response(

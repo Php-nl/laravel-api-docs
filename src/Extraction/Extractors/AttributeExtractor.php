@@ -7,6 +7,7 @@ namespace PhpNl\LaravelApiDoc\Extraction\Extractors;
 use Illuminate\Routing\Route;
 use PhpNl\LaravelApiDoc\Attributes\ApiDoc;
 use PhpNl\LaravelApiDoc\Data\Endpoint;
+use PhpNl\LaravelApiDoc\Data\Parameter;
 use ReflectionMethod;
 
 final readonly class AttributeExtractor implements Extractor
@@ -33,7 +34,7 @@ final readonly class AttributeExtractor implements Extractor
             return;
         }
 
-        $reflection = new \ReflectionMethod($controller, $method);
+        $reflection = new ReflectionMethod($controller, $method);
         $attributes = $reflection->getAttributes(ApiDoc::class);
 
         if (! empty($attributes)) {
@@ -66,15 +67,15 @@ final readonly class AttributeExtractor implements Extractor
         foreach ($queryParams as $paramAttr) {
             /** @var \PhpNl\LaravelApiDoc\Attributes\QueryParam $param */
             $param = $paramAttr->newInstance();
-            
-            $endpoint->addParameter(new \PhpNl\LaravelApiDoc\Data\Parameter(
+
+            $endpoint->addParameter(new Parameter(
                 name: $param->name,
                 type: $param->type,
                 required: $param->required,
                 description: $param->description,
                 in: 'query',
                 rules: [],
-                enumValues: !empty($param->enumValues) ? $param->enumValues : null,
+                enumValues: ! empty($param->enumValues) ? $param->enumValues : null,
                 example: $param->example
             ));
         }
@@ -84,15 +85,15 @@ final readonly class AttributeExtractor implements Extractor
         foreach ($bodyParams as $paramAttr) {
             /** @var \PhpNl\LaravelApiDoc\Attributes\BodyParam $param */
             $param = $paramAttr->newInstance();
-            
-            $endpoint->addParameter(new \PhpNl\LaravelApiDoc\Data\Parameter(
+
+            $endpoint->addParameter(new Parameter(
                 name: $param->name,
                 type: $param->type,
                 required: $param->required,
                 description: $param->description,
                 in: 'body',
                 rules: [],
-                enumValues: !empty($param->enumValues) ? $param->enumValues : null,
+                enumValues: ! empty($param->enumValues) ? $param->enumValues : null,
                 example: $param->example
             ));
         }
