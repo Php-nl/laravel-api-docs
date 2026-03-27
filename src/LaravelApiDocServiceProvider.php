@@ -61,6 +61,6 @@ final class LaravelApiDocServiceProvider extends ServiceProvider
      */
     private function registerLivewireComponents(): void
     {
-        Livewire::component('laravel-api-doc::dashboard', Dashboard::class);
+        Livewire::component('api-doc-dashboard', Dashboard::class);
     }
 }
